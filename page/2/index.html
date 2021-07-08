@@ -243,6 +243,198 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2019/06/14/LPS/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/me.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="马克刘的学习记录">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2019/06/14/LPS/" itemprop="url">最长回文子序列问题</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-06-14T18:20:31+08:00">
+                2019-06-14
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index">
+                    <span itemprop="name">算法</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95/%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92/" itemprop="url" rel="index">
+                    <span itemprop="name">动态规划</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+            <div class="post-wordcount">
+              
+                
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-file-word-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">字数统计&#58;</span>
+                
+                <span title="字数统计">
+                  911
+                </span>
+              
+
+              
+                <span class="post-meta-divider">|</span>
+              
+
+              
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-clock-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">阅读时长 &asymp;</span>
+                
+                <span title="阅读时长">
+                  4
+                </span>
+              
+            </div>
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body han-init-context" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+          问题描述回文是正序与逆序相同的非空字符串。例如，所有长度为1的字符串、civic、racecar、aibohphobia（害怕回文之意）都是回文。
+设计高效算法，求给定输入字符串的最长回文子序列。例如，给定输入 character，算法应该返回 carac。算法的运行时间是怎么样的？
+题解本题出自《
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2019/06/14/LPS/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2018/03/11/visdom-1/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -378,45 +570,22 @@
       
         
           
-            <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
-
-<h1 id="Visdom"><a href="#Visdom" class="headerlink" title="Visdom"></a>Visdom</h1><p>Visdom是Pytorch自带的一个可视化工具，能够在训练神经网络的过程中，将一些数据进行可视化。目前Visdom可以支持Numpy和Torch。</p>
-<h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ pip install visdom</span><br></pre></td></tr></table></figure>
-
-<h2 id="启动服务"><a href="#启动服务" class="headerlink" title="启动服务"></a>启动服务</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ python -m visdom.server</span><br></pre></td></tr></table></figure>
-
-<p>默认的端口号为8097，如果需要更改端口号，可以加入-p选项</p>
-<h2 id="两个概念"><a href="#两个概念" class="headerlink" title="两个概念"></a>两个概念</h2><p>使用Visdom需要区分其中的一些概念，以将可视化环境分隔开</p>
-<h3 id="Panes"><a href="#Panes" class="headerlink" title="Panes"></a>Panes</h3><p>Panes即窗格，其中可以显示具体的数据可视化内容。Panes可以进行拖放、删除等操作。</p>
-<p><img src="/2018/03/11/visdom-1/pane.png" alt="panes"></p>
-<h3 id="env"><a href="#env" class="headerlink" title="env"></a>env</h3><p>env即Environment。Pane存放在env中，一个env中可以存放多个pane。默认的env为<code>main</code>，可以在初始化Visdom的时候指定env，如</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> visdom <span class="keyword">import</span> Visdom</span><br><span class="line"></span><br><span class="line">vis = Visdom()</span><br></pre></td></tr></table></figure>
-
-<p>此时默认环境为<code>main</code></p>
-<p>而假设想将环境改为<code>loss</code></p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> visdom <span class="keyword">import</span> Visdom</span><br><span class="line"></span><br><span class="line">vis = Visdom(env=<span class="string">&#x27;loss&#x27;</span>)</span><br></pre></td></tr></table></figure>
-<p>则此时的visdom环境变成了<code>loss</code></p>
-<h2 id="几个API"><a href="#几个API" class="headerlink" title="几个API"></a>几个API</h2><p>Visdom中提供了不同的API，来绘制不同类型的图像。</p>
-<h3 id="plot-scatter"><a href="#plot-scatter" class="headerlink" title="plot.scatter"></a>plot.scatter</h3><p>plot.scatter 用来绘制2D或者3D的散点图，需要输入N * 2或者N * 3的tensor X来确定N个点的位置。</p>
-<h3 id="plot-line"><a href="#plot-line" class="headerlink" title="plot.line"></a>plot.line</h3><p>这个API可以用来绘制线条。它需要一个形状为N或者N*M的tensorY，用来指定M条线的值（每条线上有N个点），和一个可选的tensorX来指定X轴的值。X可以是一个长度为N的tensor（此时M条线共享一个X），也可以是一个形状和tensorY相同的tensor。</p>
-<h3 id="plot-image"><a href="#plot-image" class="headerlink" title="plot.image"></a>plot.image</h3><p>这个API用来画图像。输入</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">img(tensor):shape(C * H * W)</span><br></pre></td></tr></table></figure>
-<h2 id="示例代码"><a href="#示例代码" class="headerlink" title="示例代码"></a>示例代码</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> visdom <span class="keyword">import</span> visdom</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line">vis = Visdom(env=<span class="string">&#x27;test&#x27;</span>)</span><br><span class="line">win = vis.line(</span><br><span class="line">        X=np.zeros(<span class="number">1</span>),</span><br><span class="line">        Y=np.zeros(<span class="number">1</span>),</span><br><span class="line">        opts=<span class="built_in">dict</span>(title=<span class="string">&#x27;test_random&#x27;</span>)</span><br><span class="line">)</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">100</span>):</span><br><span class="line">    vis.line(</span><br><span class="line">        X=np.array([i]),</span><br><span class="line">        Y=np.random.randn(<span class="number">1</span>),</span><br><span class="line">        win=win,</span><br><span class="line">        update=<span class="string">&#x27;append&#x27;</span></span><br><span class="line">    ) <span class="comment"># win要和之前的win保持一致，update选择append不会覆盖之前的数据</span></span><br></pre></td></tr></table></figure>
-<p>效果：</p>
-<p><img src="/2018/03/11/visdom-1/test_random.png" alt="test"></p>
-<h2 id="远程使用Visdom"><a href="#远程使用Visdom" class="headerlink" title="远程使用Visdom"></a>远程使用Visdom</h2><p>很多时候训练神经网络并不是在自己的电脑上进行，而是在远端的服务器上进行。下面介绍如何连接查看服务器端的visdom</p>
-<h3 id="SSH连接"><a href="#SSH连接" class="headerlink" title="SSH连接"></a>SSH连接</h3><p>在命令行中输入</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh -L 18097:127.0.0.1:8097 username@remote_ip</span><br></pre></td></tr></table></figure>
-<p>其中，18097:127.0.0.1代表自己机器上的端口号，8097是服务器上visdom的端口号。username是在远程服务器上的用户名，remote_ip是服务器的ip地址。</p>
-<p>效果：<br><img src="/2018/03/11/visdom-1/remote.png" alt="remote"></p>
-<h3 id="启动visdom服务器"><a href="#启动visdom服务器" class="headerlink" title="启动visdom服务器"></a>启动visdom服务器</h3><p>同上面介绍的一样，在服务器端启动visdom服务，输入</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ python -m visdom.server</span><br></pre></td></tr></table></figure>
-
-<h3 id="在本地浏览器中浏览"><a href="#在本地浏览器中浏览" class="headerlink" title="在本地浏览器中浏览"></a>在本地浏览器中浏览</h3><p>启动完远程的visdom服务之后，在本地浏览器中输入</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:18097</span><br></pre></td></tr></table></figure>
-<p>即可访问服务器端的visdom</p>
-
           
+
+VisdomVisdom是Pytorch自带的一个可视化工具，能够在训练神经网络的过程中，将一些数据进行可视化。目前Visdom可以支持Numpy和Torch。
+安装1$ pip install visdom
+
+启动服务1$ python -m visdom.server
+
+默认的端口号为809
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2018/03/11/visdom-1/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -502,9 +671,9 @@
             
               <div class="site-state-item site-state-posts">
               
-                <a href="/archives/%7C%7C%20archive">
+                <a href="/archives/%7C%7Carchive">
               
-                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-count">12</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -515,7 +684,7 @@
               
               <div class="site-state-item site-state-categories">
                 <a href="/categories/index.html">
-                  <span class="site-state-item-count">13</span>
+                  <span class="site-state-item-count">15</span>
                   <span class="site-state-item-name">分类</span>
                 </a>
               </div>
@@ -578,7 +747,7 @@
     
       <span class="post-meta-item-text">Site words total count&#58;</span>
     
-    <span title="Site words total count">23.6k</span>
+    <span title="Site words total count">25.4k</span>
   
 </div>
 

@@ -243,6 +243,196 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2021/07/08/leveldb-source-code-reading-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/me.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="马克刘的学习记录">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2021/07/08/leveldb-source-code-reading-1/" itemprop="url">LevelDB 源代码阅读（一）：写流程</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-07-08T10:17:32+08:00">
+                2021-07-08
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index">
+                    <span itemprop="name">数据库</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/LevelDB/" itemprop="url" rel="index">
+                    <span itemprop="name">LevelDB</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+            <div class="post-wordcount">
+              
+                
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-file-word-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">字数统计&#58;</span>
+                
+                <span title="字数统计">
+                  1.7k
+                </span>
+              
+
+              
+                <span class="post-meta-divider">|</span>
+              
+
+              
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-clock-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">阅读时长 &asymp;</span>
+                
+                <span title="阅读时长">
+                  7
+                </span>
+              
+            </div>
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body han-init-context" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+          LevelDB 是一款基于 LSM 树的嵌入式高性能 NoSQL 数据库，由 Google 的两位 Fellow （Jeff Dean 和 Sanjay Ghemawat）设计开发。LevelDB 最初使用 C++ 开发，后面衍生出了不同语言版本，如 Go-LevelDB、 Java-LevelDB
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/07/08/leveldb-source-code-reading-1/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2021/05/10/DesignPattern-1/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -367,48 +557,15 @@
       
         
           
-            <p>设计模式是程序员对以往代码开发经验的总结，是解决特定问题的套路。设计模式不是类库，是一套用来提高代码可复用性、可读性、稳健性的解决方案。1995 年，GoF（Gang of Four，四人组/四人帮）合作出版了《设计模式：可复用面向对象软件的基础》一书，共收录了 23 种设计模式，从此树立了软件设计模式领域的里程碑。本系列博客是笔者在阅读结浩城的<a target="_blank" rel="noopener" href="https://book.douban.com/subject/26933281/">《图解设计模式》</a>一书后的总结。</p>
-<h1 id="迭代器模式"><a href="#迭代器模式" class="headerlink" title="迭代器模式"></a>迭代器模式</h1><p>迭代器（Iterator）模式旨在对类的遍历进行封装。《图解设计模式》中给出了下面的例子：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Iterator.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">Iterator</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">boolean</span> <span class="title">hasNext</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> Object <span class="title">next</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Aggregate.java </span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">Aggregate</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> Iterator <span class="title">iterator</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>Iterator</code> 和 <code>Aggregate</code> 是两个抽象接口，分别是迭代器和集合。<code>Aggregate</code> 只有一个方法，就是返回一个迭代器。<code>Iterator</code> 中的 <code>hasNext</code> 用来判断迭代是否已经结束，<code>next</code> 用以返回下一个元素。在实际使用的过程中，通常是下面这样：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// SomeClassAggregate.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SomeClassAggregate</span> <span class="keyword">extends</span> <span class="title">Aggregate</span> </span>&#123;</span><br><span class="line">  <span class="comment">// SomeClassAggregate contains a collection of SomeClass in it.</span></span><br><span class="line">  <span class="function"><span class="keyword">public</span> Iterator <span class="title">iterator</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> SomeClassAggregateIterator(<span class="keyword">this</span>);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="class"><span class="keyword">class</span> <span class="title">SomeClassAggregateIterator</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">SomeClassAggregateIterator</span><span class="params">(SomeClassAggregate instance)</span> </span>&#123;</span><br><span class="line">      ...</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">hasNext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">      ...</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> Object <span class="title">next</span><span class="params">()</span> </span>&#123;</span><br><span class="line">      ...</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// somewhere using SomeClass</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">someMethod</span><span class="params">()</span> </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  SomeClassAggregate instance = <span class="keyword">new</span> SomeClassAggregate();</span><br><span class="line">  Iterator iterator = instance.iterator();</span><br><span class="line">  <span class="keyword">while</span>(iterator.hasNext()) &#123;</span><br><span class="line">    SomeClass someClass = (SomeClass)iterator.next();</span><br><span class="line">    ... <span class="comment">// do something</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这样做的好处是什么呢？<code>SomeClassAggregate</code> 中保存了许多的 <code>SomeClass</code>，有可能是以数组的形式存储，也有可能以 Java 类库中 <code>ArrayList</code> 的形式存储。如果我们直接对 <code>SomeClass</code> 中的成员变量直接遍历的话，当 <code>SomeClass</code> 的存储的数据结构发生改变时，那么遍历的代码也要改发生改变。通过迭代器模式，将遍历和集合进行解耦，当集合类发生变化时，只需要修改 <code>Iterator</code> 中的一处代码即可，其余处代码则无需修改。</p>
-<h1 id="适配器模式"><a href="#适配器模式" class="headerlink" title="适配器模式"></a>适配器模式</h1><p>很多时候，我们不是从零开始编程，经常会用到现有的类。特别是当现有的类已经被充分测试过，Bug 很少，而且已经被用在了其他软件之中时，我们更愿意将这些类作为组件重复利用。</p>
-<p>适配器（Adapter）模式会对现有的类进行适配，生成新的类。使用适配器模式，可以在不修改原有代码的情况下使得原有的类支持新加功能的要求。通过该模式可以很方便地创建我们需要的方法群。</p>
-<p>适配器模式实际上就是通过继承或者委托，使用原来类中的功能，使原本不支持某个功能的类支持某个功能。书中给出下面这个例子：</p>
-<h2 id="通过继承实现"><a href="#通过继承实现" class="headerlink" title="通过继承实现"></a>通过继承实现</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Banner.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Banner</span> </span>&#123;</span><br><span class="line">  <span class="keyword">private</span> String string;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="title">Banner</span><span class="params">(String string)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">this</span>.string = string;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">showWithParen</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    System.out.println(<span class="string">&quot;(&quot;</span> + string + <span class="string">&quot;)&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">showWithAster</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    System.out.println(<span class="string">&quot;*&quot;</span> + string + <span class="string">&quot;*&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Print.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">Print</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">printWeak</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">printStrong</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>假如我们需要让 <code>Banner</code> 实现 <code>Print</code> 中的功能，在不修改 <code>Banner</code> 本身的前提下，我们可以使用一个适配器 <code>PrintBanner</code>：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// PrintBanner.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">PrintBanner</span> <span class="keyword">extends</span> <span class="title">Banner</span> <span class="keyword">implements</span> <span class="title">Print</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="title">PrintBanner</span><span class="params">(String string)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">super</span>(string);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">printWeak</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    showWithParen();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">printStrong</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    showWithAster();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这样，<code>PrintBanner</code> 就成了一个使 <code>Banner</code> 实现 <code>Print</code> 接口的适配器，其实现依赖的是 <code>Banner</code> 中原有的 <code>showWithParen</code> 和 <code>showWithAster</code> 方法。</p>
-<h2 id="通过委托实现"><a href="#通过委托实现" class="headerlink" title="通过委托实现"></a>通过委托实现</h2><p>当 <code>Print</code> 不是一个接口而是一个类时，我们无法使用继承来完成适配器的实现，因为 Java 中无法继承两个类。<br>此时，可以通过委托来实现。所谓委托，其实也就是将原有类封装在另一个类中，通过调用原有类的方法来实现对应的功能，例如：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Print.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">Print</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">printWeak</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">printStrong</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// PrintBanner.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">PrintBanner</span> <span class="keyword">extends</span> <span class="title">Print</span> </span>&#123;</span><br><span class="line">  <span class="keyword">private</span> Banner banner;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="title">PrintBanner</span><span class="params">(String string)</span> </span>&#123;</span><br><span class="line">    banner = <span class="keyword">new</span> Banner(string);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">printWeak</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    banner.printWithParen();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">printStrong</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    banner.printWithAster();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这样，<code>PrintBanner</code> 就在无需修改 <code>Banner</code> 的情况下实现了 <code>Print</code> 中的功能。当有一个第三方调用时，例如</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">  Print p = <span class="keyword">new</span> PrintBanner(<span class="string">&quot;test&quot;</span>);</span><br><span class="line">  p.printWeak();</span><br><span class="line">  p.printStrong();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>其无需考虑 <code>PrintBanner</code> 中到底是怎么实现的，只需要直接调用其功能即可。</p>
-<h2 id="代码调试"><a href="#代码调试" class="headerlink" title="代码调试"></a>代码调试</h2><p>当出现 Bug 时，我们知道 Bug 不在现有的类中，所以只需要检查 Adapter 中的代码即可。这样一来，代码排查会变得非常简单。</p>
-<h1 id="模板方法（Template-Method）模式"><a href="#模板方法（Template-Method）模式" class="headerlink" title="模板方法（Template Method）模式"></a>模板方法（Template Method）模式</h1><p>这里介绍的 Template Method 其实有别于在 C++ 中使用的 Template，模板方法模式的主要思想是父类负责调度执行流程，子类负责实现执行的细节。具体的实现方式是，在父类中定义一系列已经实现的方法和一些抽象方法，在已实现的方法中负责调度这些抽象方法的使用，而子类则需要在抽象方法中实现具体的执行细节。</p>
-<p>书中给出了这样的一个例子：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AbstactDisplay.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">AbstractDisplay</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">open</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">close</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">print</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">display</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    open();</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">5</span>; ++i) &#123;</span><br><span class="line">      print();</span><br><span class="line">    &#125;</span><br><span class="line">    close();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><code>AbstractDisplay</code> 作为父类，定义了三个抽象方法 <code>open</code>、<code>close</code> 和 <code>print</code>，并且在 <code>display</code> 这个 final 方法中规定了调用顺序为 <code>open</code> -&gt; 五次 <code>print</code> -&gt; <code>close</code> 。由于 <code>AbstractDisplay</code> 是一个抽象类，无法进行实例化，因此我们需要使用一个子类来对这些抽象方法进行实现。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// StringDisplay.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">StringDisplay</span> </span>&#123;</span><br><span class="line">  <span class="keyword">private</span> String value;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@Override</span></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">open</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    printLine();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@Override</span></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">print</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    System.out.println(<span class="string">&quot;|&quot;</span> + value + <span class="string">&quot;|&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@Override</span></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">close</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    printLine();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="meta">@Override</span></span><br><span class="line">  <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">printLine</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    System.out.print(<span class="string">&quot;+&quot;</span>);</span><br><span class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; value.length(); ++i) &#123;</span><br><span class="line">      System.out.print(<span class="string">&quot;-&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    System.out.println(<span class="string">&quot;+&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在 <code>StringDisplay</code> 中实现了 <code>AbstractDisplay</code> 定义的抽象方法，因此假如我们拿到一个 <code>value=&quot;Hello, World&quot;</code> 的 <code>StringDisplay</code> 实例时，调用其 <code>display</code> 方法，会得到以下输出</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">+-----------+</span><br><span class="line">|Hello, World|</span><br><span class="line">|Hello, World|</span><br><span class="line">|Hello, World|</span><br><span class="line">|Hello, World|</span><br><span class="line">|Hello, World|</span><br><span class="line">+-----------+</span><br></pre></td></tr></table></figure>
-
-<p>当然，如果我们在不同的子类中实现不同的 <code>open</code>、<code>close</code> 和 <code>print</code> 方法，也会得到不一样的输出，但是 <code>display</code> 执行流程已经在父类中定义好了。</p>
-<p>在 Java 的 InputStream 中就是用了模板方法模式，例如在 InputStream 中有这样一个函数</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// InputStream.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">InputStream</span></span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">int</span> <span class="title">read</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">read</span><span class="params">(<span class="keyword">byte</span> b[], <span class="keyword">int</span> off, <span class="keyword">int</span> len)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">          Objects.checkFromIndexSize(off, len, b.length);</span><br><span class="line">          <span class="keyword">if</span> (len == <span class="number">0</span>) &#123;</span><br><span class="line">              <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">          &#125;</span><br><span class="line"></span><br><span class="line">          <span class="keyword">int</span> c = read();</span><br><span class="line">          <span class="keyword">if</span> (c == -<span class="number">1</span>) &#123;</span><br><span class="line">              <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">          &#125;</span><br><span class="line">          b[off] = (<span class="keyword">byte</span>)c;</span><br><span class="line"></span><br><span class="line">          <span class="keyword">int</span> i = <span class="number">1</span>;</span><br><span class="line">          <span class="keyword">try</span> &#123;</span><br><span class="line">              <span class="keyword">for</span> (; i &lt; len ; i++) &#123;</span><br><span class="line">                  c = read();</span><br><span class="line">                  <span class="keyword">if</span> (c == -<span class="number">1</span>) &#123;</span><br><span class="line">                      <span class="keyword">break</span>;</span><br><span class="line">                  &#125;</span><br><span class="line">                  b[off + i] = (<span class="keyword">byte</span>)c;</span><br><span class="line">              &#125;</span><br><span class="line">          &#125; <span class="keyword">catch</span> (IOException ee) &#123;</span><br><span class="line">          &#125;</span><br><span class="line">          <span class="keyword">return</span> i;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>在上面这个函数中，规定了不带参数的 <code>read</code> 被如何调用以实现 <code>read(byte b[], int off, int len)</code> 方法，而不同子类中的 <code>read</code> 则会有不同的实现，例如 <code>FileInputStream</code> 和 <code>StringBufferedInputStream</code> 中的实现各不相同，这些对于 <code>InputStream</code> 来说都是不必考虑的。</p>
-<h1 id="工厂方法模式"><a href="#工厂方法模式" class="headerlink" title="工厂方法模式"></a>工厂方法模式</h1><p>工厂方法（Factory Method）模式不同于工厂模式，其是模板方法（Template Method）模式的一种拓展。在这种模式中，有两种抽象接口：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Factory.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">Factory</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">final</span> Product <span class="title">create</span><span class="params">(String owner)</span> </span>&#123;</span><br><span class="line">    Product product = createProduct(owner);</span><br><span class="line">    registerProduct(product);</span><br><span class="line">    <span class="keyword">return</span> product;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> Product <span class="title">createProduct</span><span class="params">(String owner)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">registerProduct</span><span class="params">(Product product)</span></span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Product.java</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">Product</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">use</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在 <code>Product</code> 中只有一个抽象方法 <code>use</code> ，代表所有商品都是可以被使用的。在 <code>Factory</code> 中，有抽象方法 <code>createProduct</code> 和 <code>registerProduct</code> ，以及 final 方法 <code>create</code> 。在 <code>create</code> 中，规定了生产一个产品的流程应该是先制造（<code>createProduct</code>）再注册（<code>registerProduct</code>），而至于怎么制造和注册，则由子类决定，<code>Product</code> 具体的是哪一类，也由继承 <code>Factory</code> 的类决定。当有新的产品需要被制造时，不需要修改原有的 <code>Factory</code> 和 <code>Product</code> ，只需新创建这个产品对应的 <code>Factory</code> 和 <code>Product</code> 即可。</p>
-
-          
+          设计模式是程序员对以往代码开发经验的总结，是解决特定问题的套路。设计模式不是类库，是一套用来提高代码可复用性、可读性、稳健性的解决方案。1995 年，GoF（Gang of Four，四人组/四人帮）合作出版了《设计模式：可复用面向对象软件的基础》一书，共收录了 23 种设计模式，从此树立了软件设计
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/05/10/DesignPattern-1/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -590,28 +747,19 @@
       
         
           
-            <h1 id="Insert-单行数据"><a href="#Insert-单行数据" class="headerlink" title="Insert 单行数据"></a>Insert 单行数据</h1><p>单行数据指一个时间戳下，一个设备多个测点的一行测量值。<br>下面以 <code>Session</code> 的 <code>insertRecord</code> 接口为例，展示插入数据的过程。</p>
-<img src="/2021/04/04/IoTDB-source-code-reading-data-inserting/iotdb插入流程.png" height="60%" width="60%">
+          Insert 单行数据单行数据指一个时间戳下，一个设备多个测点的一行测量值。下面以 Session 的 insertRecord 接口为例，展示插入数据的过程。
 
-<p>简单来说，单行数据的插入分成三个阶段。分别是插入计划生成、插入计划路由、数据插入。</p>
-<h2 id="插入计划生成"><a href="#插入计划生成" class="headerlink" title="插入计划生成"></a>插入计划生成</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TSServiceImpl.java</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 检查用户状态，根据 req 中的信息生成 InsertRowPlan，并检查用户对于该插入计划的权限</span></span><br><span class="line"><span class="function">TSStatus <span class="title">insertRecord</span><span class="params">(TSInsertRecordReq req)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 检查插入计划是否满足完整性约束（integrity），如果满足则继续执行</span></span><br><span class="line"><span class="function">TSStatus <span class="title">executeNonQueryPlan</span><span class="params">(PhysicalPlan plan)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 检查数据库此时是否处于只读（Read-Only）状态，如果是则停止插入，否则调用 PlanExecutor 的 processNonQuery 接口执行插入计划</span></span><br><span class="line"><span class="function"><span class="keyword">boolean</span> <span class="title">executeNonQuery</span><span class="params">(PhysicalPlan plan)</span></span>;</span><br></pre></td></tr></table></figure>
-<p>在 <em>TSServiceImpl.java</em> 中，根据收到的插入参数，生成对应的 <code>InsertRowPlan</code>。在检查完用户状态、执行权限、数据库状态等信息后，将该 <code>InsertRowPlan</code> 传给 <code>PlanExecutor</code>。</p>
-<h2 id="插入计划路由"><a href="#插入计划路由" class="headerlink" title="插入计划路由"></a>插入计划路由</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// PlanExecutor.java</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 通过一个 switch，找到 PhysicalPlan 对应的处理函数</span></span><br><span class="line"><span class="comment">// 这里我们是一个 InsertRowPlan，对应的处理函数是 insert(InsertRowPlan insertRowPlan)</span></span><br><span class="line"><span class="function"><span class="keyword">boolean</span> <span class="title">processNonQuery</span><span class="params">(PhysicalPlan plan)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 先获取插入序列对应的 MeasurementMNode，并且检查 InsertRowPlan 中对应的数据类型和 MNode 中的数据类型是否相符</span></span><br><span class="line"><span class="comment">// 若不相符，则尝试进行数据值类型转换</span></span><br><span class="line"><span class="comment">// 若相符或已经完成了转换，下一步会调用 StrogaeEngine 实例的 insert(InsertRowPlan insertRowPlan) 接口进行插入</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">insert</span><span class="params">(InsertRowPlan insertRowPlan)</span></span>;</span><br></pre></td></tr></table></figure>
-<p><code>PlanExecutor</code> 的 <code>processNonQuery</code> 接收的参数类型为 <code>PhysicalPlan</code>，包含删除、插入、批量插入等类型，这里我们传入的是插入类型的计划，于是将其路由到 <code>insert</code> 函数中。在 <code>PlanExecutor</code> 的 <code>insert</code> 函数中，其调用 <code>StroageEngine</code> 的 <code>insert</code> 接口来完成插入。</p>
-<h2 id="插入"><a href="#插入" class="headerlink" title="插入"></a>插入</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// StroageEngine.java</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// StorageEngine 采用单例模式，即全局只有唯一的一个 StorageEngine 实例。</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">insert</span><span class="params">(InsertRowPlan insertRowPlan)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 获取插入路径对应的 StroageGroup 的 Processor</span></span><br><span class="line">StorageGroupProcessor storageGroupProcessor = getProcessor(insertRowPlan.getDeviceId());</span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">  <span class="comment">// 在该 processor 中插入</span></span><br><span class="line">    storageGroupProcessor.insert(insertRowPlan);</span><br><span class="line">    ...</span><br><span class="line">  &#125; <span class="keyword">catch</span> (WriteProcessException e) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> StorageEngineException(e);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><code>StorageEngine</code> 找到该 <code>InsertRowPlan</code> 对应的 <code>StorageGroup</code> 的 <code>StorageGroupProcessor</code>，然后继续调用其 <code>insert</code> 接口。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// StorageGroupProcessor.java</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">insert</span><span class="params">(InsertRowPlan insertRowPlan)</span> <span class="keyword">throws</span> WriteProcessException </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="comment">// 获取写锁</span></span><br><span class="line">  writeLock();</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="comment">// init map</span></span><br><span class="line">    <span class="keyword">long</span> timePartitionId = StorageEngine.getTimePartition(insertRowPlan.getTime());</span><br><span class="line">    partitionLatestFlushedTimeForEachDevice.computeIfAbsent(</span><br><span class="line">        timePartitionId, id -&gt; <span class="keyword">new</span> HashMap&lt;&gt;());</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 插入的数据是否有序，即当前插入的数据是否比之前插入数据的最大值还大</span></span><br><span class="line">    <span class="keyword">boolean</span> isSequence =</span><br><span class="line">        insertRowPlan.getTime()</span><br><span class="line">            &gt; partitionLatestFlushedTimeForEachDevice</span><br><span class="line">                .get(timePartitionId)</span><br><span class="line">                .getOrDefault(insertRowPlan.getDeviceId().getFullPath(), Long.MIN_VALUE);</span><br><span class="line">    <span class="comment">// 无序数据，且用户设置丢弃乱序数据</span></span><br><span class="line">    <span class="keyword">if</span> (!isSequence</span><br><span class="line">        &amp;&amp; IoTDBDescriptor.getInstance().getConfig().isEnableDiscardOutOfOrderData()) &#123;</span><br><span class="line">      <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 插入数据</span></span><br><span class="line">    insertToTsFileProcessor(insertRowPlan, isSequence, timePartitionId);</span><br><span class="line">  &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">    <span class="comment">// 释放写锁</span></span><br><span class="line">    writeUnlock();</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">insertToTsFileProcessor</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">      InsertRowPlan insertRowPlan, <span class="keyword">boolean</span> sequence, <span class="keyword">long</span> timePartitionId)</span></span></span><br><span class="line"><span class="function">      <span class="keyword">throws</span> WriteProcessException </span>&#123;</span><br><span class="line">  <span class="comment">// 获取 TsFileProcessor，如果没有就创建一个</span></span><br><span class="line">  TsFileProcessor tsFileProcessor = getOrCreateTsFileProcessor(timePartitionId, sequence);</span><br><span class="line">  <span class="keyword">if</span> (tsFileProcessor == <span class="keyword">null</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 插入数据</span></span><br><span class="line">  tsFileProcessor.insert(insertRowPlan);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 更新该 device 的最后插入时间</span></span><br><span class="line">  <span class="keyword">if</span> (latestTimeForEachDevice</span><br><span class="line">          .get(timePartitionId)</span><br><span class="line">          .getOrDefault(insertRowPlan.getDeviceId().getFullPath(), Long.MIN_VALUE)</span><br><span class="line">      &lt; insertRowPlan.getTime()) &#123;</span><br><span class="line">    latestTimeForEachDevice</span><br><span class="line">        .get(timePartitionId)</span><br><span class="line">        .put(insertRowPlan.getDeviceId().getFullPath(), insertRowPlan.getTime());</span><br><span class="line">  &#125;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br><span class="line">  </span><br></pre></td></tr></table></figure>
-<p><code>StorageGroupProcessor</code> 找到对应的 <code>TsFileProcessor</code>，继续调用其 <code>insert</code> 接口。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TsFileProcessor.java</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">insert</span><span class="params">(InsertRowPlan insertRowPlan)</span> <span class="keyword">throws</span> WriteProcessException </span>&#123;</span><br><span class="line">  <span class="comment">// 申请 WorkMemTable</span></span><br><span class="line">  <span class="keyword">if</span> (workMemTable == <span class="keyword">null</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (enableMemControl) &#123;</span><br><span class="line">      workMemTable = <span class="keyword">new</span> PrimitiveMemTable(enableMemControl);</span><br><span class="line">      MemTableManager.getInstance().addMemtableNumber();</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      workMemTable = MemTableManager.getInstance().getAvailableMemTable(storageGroupName);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 插入到 MemTable 中</span></span><br><span class="line">  workMemTable.insert(insertRowPlan);</span><br><span class="line"></span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><code>TsFileProcessor</code> 中维护了一个 <code>MemTable</code>，其将数据保存在内存中。在接收到插入的计划后，<code>TsFileProcessor</code> 将这些数据插入到 <code>MemTable</code> 中。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AbstractMemTable.java</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">insert</span><span class="params">(InsertRowPlan insertRowPlan)</span> </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  <span class="comment">// 将所有的数据插入</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; values.length; i++) &#123;</span><br><span class="line">    Object value = values[i];</span><br><span class="line">    <span class="keyword">if</span> (value == <span class="keyword">null</span>) &#123;</span><br><span class="line">      <span class="keyword">continue</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    write(</span><br><span class="line">        insertRowPlan.getDeviceId().getFullPath(),</span><br><span class="line">         measurements[i],</span><br><span class="line">        measurementMNodes[i].getSchema(),</span><br><span class="line">        insertRowPlan.getTime(),</span><br><span class="line">        value);</span><br><span class="line">  &#125;</span><br><span class="line">  totalPointsNum +=</span><br><span class="line">      insertRowPlan.getMeasurements().length - insertRowPlan.getFailedMeasurementNumber();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">write</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">    String deviceId,</span></span></span><br><span class="line"><span class="params"><span class="function">    String measurement,</span></span></span><br><span class="line"><span class="params"><span class="function">    MeasurementSchema schema,</span></span></span><br><span class="line"><span class="params"><span class="function">    <span class="keyword">long</span> insertTime,</span></span></span><br><span class="line"><span class="params"><span class="function">    Object objectValue)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 获取 MemChunk</span></span><br><span class="line">  IWritableMemChunk memSeries = createIfNotExistAndGet(deviceId, measurement, schema);</span><br><span class="line">  <span class="comment">// 写入数据</span></span><br><span class="line">  memSeries.write(insertTime, objectValue);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// WritableMemChunk.java</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">write</span><span class="params">(<span class="keyword">long</span> insertTime, Object objectValue)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 根据数据类型路由到对应的插入函数</span></span><br><span class="line">  <span class="keyword">switch</span> (schema.getType()) &#123;</span><br><span class="line">    <span class="keyword">case</span> BOOLEAN:</span><br><span class="line">      putBoolean(insertTime, (<span class="keyword">boolean</span>) objectValue);</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> INT32:</span><br><span class="line">      putInt(insertTime, (<span class="keyword">int</span>) objectValue);</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> INT64:</span><br><span class="line">      putLong(insertTime, (<span class="keyword">long</span>) objectValue);</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> FLOAT:</span><br><span class="line">      putFloat(insertTime, (<span class="keyword">float</span>) objectValue);</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> DOUBLE:</span><br><span class="line">      putDouble(insertTime, (<span class="keyword">double</span>) objectValue);</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> TEXT:</span><br><span class="line">       putBinary(insertTime, (Binary) objectValue);</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> UnSupportedDataTypeException(<span class="string">&quot;Unsupported data type:&quot;</span> + schema.getType());</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">// 以 int 为例，其插入函数将 &lt;t, v&gt; 对插入到 list 中</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">putInt</span><span class="params">(<span class="keyword">long</span> t, <span class="keyword">int</span> v)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// list 是一个 TVList 类，记录 TimeStamp 和 Value 对</span></span><br><span class="line">  list.putInt(t, v);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在 <code>MemTable</code> 中，其使用的是一个 <code>TVList</code> 数据结构来存储插入的数据，该数据结构每次插入时都将一个 <code>&lt;TimeStamp, Value&gt;</code> 对保存下来。</p>
-<h1 id="插入多行数据"><a href="#插入多行数据" class="headerlink" title="插入多行数据"></a>插入多行数据</h1><p><code>Session</code> 的 <code>insertTablet</code> 可以插入多行数据，其大致顺序跟插入单行数据类似。区别在于，生成的插入计划不是 <code>InsertRowPlan</code>，而是 <code>InsertTabletPlan</code>。在 <code>PlanExecutor</code> 中路由时，会路由到 <code>insertTablet</code> 函数中。在插入过程中，各个层级的 <code>Processor</code> 调用的是 <code>insertTablet</code> 函数而不是 <code>insert</code> 函数。在 <code>StroageGroupProcessor</code> 中，其会将一个 <code>Tablet</code> 中的数据分成多个小批次，然后将这些分批的数据分别插入到 <code>TsFileProcessor</code> 中。</p>
-
-          
+简单来说，单行数据的插入分成三个阶段。分别是插入计划生成、插入计划路由、数据插入。
+插入计划生成12345678910// TSSer
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/04/04/IoTDB-source-code-reading-data-inserting/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -793,83 +941,16 @@
       
         
           
-            <p>在现代操作系统中，使用多个进程来实现应用和系统是一种广泛使用的方法。<strong>进程间通信(Inter-Process Communication)</strong> 是多进程协作的基础。</p>
-<p>一般来说，IPC 至少需要两个进程参与。根据信息流动的方向，这两方可以被称为<strong>发送者</strong>和<strong>接收者</strong>。在实际使用中，IPC 常被用于服务调用，因此参与 IPC 的双方又被称为<strong>调用者</strong>和<strong>被调用者</strong>，或者<strong>客户端</strong>和<strong>服务端</strong>。</p>
-<p>为了有效地协同工作，进程间通信一般伴随着数据的传输。一种常用的通信数据的抽象是**消息(message)<strong>。消息一般包含一个</strong>头部(header)<strong>和一个</strong>数据段(payload)**。头部中通常含有魔数、消息长度、校验码等信息，而数据段中则既可以包含“纯”数据，也可以包含系统资源（如文件描述符等）。</p>
-<p>下面，本文将简略地介绍 IPC 的相关内容。</p>
-<h1 id="一个简单的-IPC-设计"><a href="#一个简单的-IPC-设计" class="headerlink" title="一个简单的 IPC 设计"></a>一个简单的 IPC 设计</h1><p>考虑一个简单的 IPC，内核将两个进程的一段虚拟地址映射到同一段物理地址上，即两个进程之间有一段共享内存。在通信时，发送者将要传输的数据内容拷贝到<strong>发送者消息</strong>上，然后依次设置头部中的状态（设置为“准备就绪”）等信息。接收者会不停地轮询发送者消息的状态，一旦观测到状态信息为“准备就绪”，就表示发送者发出了一个消息。发送者一发送完消息，就开始轮询<strong>接收者消息</strong>的状态，等待其变成“准备就绪”。接收者在读取到发送者的消息后，处理请求，并在接收者消息上准备返回结果。当发送者观测到接收者消息的状态为“准备就绪”后，即表示收到了返回的结果。</p>
-<p>这样，我们就利用共享内存+轮询完成了一个简单的 IPC。但是这个 IPC 有许多缺点，例如：轮询时会浪费 CPU 资源、多个线程进行通信时共享内存较为不方便等。</p>
-<h1 id="IPC-基础"><a href="#IPC-基础" class="headerlink" title="IPC 基础"></a>IPC 基础</h1><h2 id="数据传递"><a href="#数据传递" class="headerlink" title="数据传递"></a>数据传递</h2><p>从以上简单的 IPC 方案可以看出，IPC 的一个重要功能是在进程间传递数据。消息传递(message passing)是 IPC 中常用的数据传递方式：将数据抽象成一个个的消息进行传递。消息传递往往需要一个“中间人”（如共享内存、内核等）。消息传递的基本接口有以下四个：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">发送消息：Send(message)</span><br><span class="line">接收消息：Recv(message)</span><br><span class="line">远程过程调用：RPC(req_message, recv_message)</span><br><span class="line">回复消息：Reply(resp_message)</span><br></pre></td></tr></table></figure>
-<p>发送消息和接收消息的语义比较直接，远程过程调用（Remote Procedure Call，RPC）可以理解为发送端调用 <code>Send</code> 接口后紧接着调用 <code>Recv</code> 接口。<code>Reply</code> 通常用于回复一个远程过程调用。</p>
-<h3 id="基于共享内存的消息传递"><a href="#基于共享内存的消息传递" class="headerlink" title="基于共享内存的消息传递"></a>基于共享内存的消息传递</h3><p>在前面简单的 IPC 方案中，我们已经看到了进程是如何使用共享内存来进行通信的。这种方式的一个特点是：操作系统在通信过程中不干预数据传输。从操作系统的角度看，共享内存为两个（或多个）进程在其虚拟地址空间中映射了同一段物理内存，这些方案里操作系统通常不参与后续的通信过程。</p>
-<h3 id="操作系统辅助的消息传递"><a href="#操作系统辅助的消息传递" class="headerlink" title="操作系统辅助的消息传递"></a>操作系统辅助的消息传递</h3><p>操作系统辅助的消息传递指内核对用户态提供通信的接口，如 <code>Send</code> 或 <code>Recv</code> 等。进程可以直接使用这些接口，将消息传递给另一个进程，而不需要建立共享内存和执行轮询内存数据等操作。</p>
-<p>当两个进程 $P$ 和 $Q$ 通过内核接口进行 IPC 时，其需要</p>
-<ol>
-<li>通过特定的内核接口建立一个通信连接。这里的建立通信链接更多的是一个抽象的建立过程，具体的形式由内核决定，如内核可以通过维护一个数据结构来记录建立好连接的进程对。</li>
-<li>通过 <code>Send</code> 和 <code>Recv</code> 接口传递消息。</li>
-</ol>
-<h3 id="共享内存和操作系统辅助传递的对比"><a href="#共享内存和操作系统辅助传递的对比" class="headerlink" title="共享内存和操作系统辅助传递的对比"></a>共享内存和操作系统辅助传递的对比</h3><p>从性能的角度来看，共享内存在传递消息时可以实现理论上的零内存拷贝传输。这里的内存拷贝，指的是将数据从内存的一片区域拷贝到内存中的另一片区域。而在操作系统辅助传递方式中，通常需要将数据从发送者的用户态内存拷贝到内核内存，然后将数据从内核内存拷贝到接收者的用户态内存，这个过程包含两次拷贝。</p>
-<p>当然，操作系统辅助传递也有优点。第一，操作系统辅助传递的抽象更简单，内核可以保证每一次通信接口的调用都是一个消息被发送或接收，并且可以很好地支持变长消息，而共享内存则需要用户态软件来封装实现这一功能。第二，操作系统辅助传递的安全性更强，可以保证进程之间的隔离性。第三，在多方通信时，在多个进程之间共享内存是不安全的，而操作系统辅助传递则没有这个问题。</p>
-<h2 id="控制流转移"><a href="#控制流转移" class="headerlink" title="控制流转移"></a>控制流转移</h2><p>对内核来说，实现消息传递机制除了要考虑数据的传输，往往还要附带<strong>控制流转移</strong>的功能：当一个通信发生时，内核将控制流从发送者进程切换到接收者进程（返回时类似）。在共享内存的方案中，如果没有控制流转移的功能，只能通过不断地轮询来检查是否有消息到来，而这可能会浪费大量 CPU 资源。</p>
-<p>一个常见的流程如下：<br>首先，接收者进程完成初始化后将自己阻塞起来等待消息的到来（如执行阻塞的 <code>Recv</code>）。<br>之后，发送者进程发起通信（RPC）。在处理该操作时，内核首先将发送者的消息传递给接收者，然后令发送者进程进入阻塞状态，并将接收者进程从阻塞状态唤醒为预备状态。对接收者进程而言，会从阻塞的 <code>Recv</code> 函数中返回一个消息，表明收到了发送者的一个消息。<br>接收者完成处理，发送消息，然后自己进入阻塞状态。内核将数据传送到发送者进程，并将其唤醒。</p>
-<p>结合内核中的调度以及对进程的调度状态的修改，控制流转移可以避免轮询操作，从而将消息高效地进行传递。</p>
-<h2 id="单向通信与双向通信"><a href="#单向通信与双向通信" class="headerlink" title="单向通信与双向通信"></a>单向通信与双向通信</h2><p>IPC 通常包含三种可能的方向：仅支持单向通信、仅支持双向通信、单向和双向通信均可。</p>
-<p>通常来说，单向通信其实是系统软件实现 IPC 的一个基本单元，双向通信时可以基于单向 IPC 来搭建的。在接口上，如果通信建立后，通信的双方分别只能使用 <code>Send</code> 和 <code>Recv</code> 接口，那么这通常对应于单向通信。实际中，很多系统选择的是单向和双向皆可的策略，这样可以比较好地支持各种场景。当然，如管道、信号等只支持单向通信的机制在实际中同样有较多应用。</p>
-<h2 id="同步与异步-IPC"><a href="#同步与异步-IPC" class="headerlink" title="同步与异步 IPC"></a>同步与异步 IPC</h2><p>IPC 的另一种分类是：同步 IPC 和异步 IPC。简单来说，同步 IPC 在操作时会阻塞进程直到该操作完成；而异步 IPC 则通常是非阻塞的，进程只需要发起一次操作即可返回，而不需要等待其完成。异步 IPC 通常通过轮询内存状态或注册回调函数（如果内核支持）来获取返回结果。</p>
-<p>同步 IPC 往往是双向 IPC（或 RPC），即发送者需要等待返回的结果。不过也存在单向 IPC 是同步的，这种情况下发送者虽然不会等待接收者返回结果，但是其会等待接收者接收消息。</p>
-<p>在早期的微内核系统中，同步 IPC 往往是唯一的 IPC 方式。这是因为相比异步 IPC，同步 IPC 有更好的编程抽象。例如使用同步 RPC 时，调用者可以将进程间通信看作是一种函数调用，调用返回时也意味着结果返回了。但是同步 IPC 在操作系统发展的过程中，逐渐表现出一些不足。一个典型的问题是并发。当一个服务进程要响应很多客户进程的通信时，在同步 IPC 的实现下为了服务进程往往需要创建大量工作线程去响应不同的客户进程，否则可能出现客户进程阻塞的现象。但是这里也有一个问题，过多的工作线程会浪费系统资源。而使用异步 IPC 则可以在并发通信时避免这些问题。总的来看，目前大部分操作系统都会选择同时实现同步和异步的 IPC，以满足不同的应用需求。</p>
-<h2 id="超时机制"><a href="#超时机制" class="headerlink" title="超时机制"></a>超时机制</h2><p>由于进程间有隔离性，因此有一个问题时：通信的双方很难确认对方的状态。例如在同步 IPC 中，当控制流从调用者传递到被调用者后，如果被调用者恶意地不返回到调用者，那么就会使得调用者无法继续执行。异步 IPC 也有类似的问题。即使控制流不会被被调用者恶意地抢占，调用者仍然有可能花费很长时间等待一个请求的处理，例如当被调用者十分忙碌时。</p>
-<p>为了解决这个问题，IPC 的设计中引入了<strong>超时机制</strong>。超时机制扩展了 IPC 通信双方的接口，允许发送者/接收者指定它们发送/接收请求的等待时间。例如，一个用户进程可以花费 5 秒等待文件系统进程的 IPC 请求处理操作。如果超过这个时间仍没有反馈，则由操作系统内核结束这次 IPC 调用，返回一个超时错误。超时机制允许进程为一次通信的等待时间设置一个上限，从而避免类似<strong>拒绝服务</strong>的攻击情况出现。</p>
-<p>但是在实际中，大部分进程难以决定一个合理的超时。例如前面等待文件系统进程的 5 秒，当处理的数据量非常大时，5 秒可能不够文件系统进程处理请求。一个过短的超时显然不行，但是一个过长的超时又容易使得调用者无法察觉被调用者的异常。因此，内核常引入两个特殊的超时选择：“永不返回”和“立即返回”。“永不返回”和引入超时机制之前的状态类似；而“立即返回”则是说只有当前被调用者处于可以立即响应的状态才会真的发起通信，否则就直接返回。更注重安全性时应该选择“立即返回”，更注重功能性时则应选择“永不返回”，这由发送者决定。</p>
-<h2 id="直接通信与间接通信"><a href="#直接通信与间接通信" class="headerlink" title="直接通信与间接通信"></a>直接通信与间接通信</h2><p>在建立一个连接时，虽然不同的系统有不同的实现，但是通常可以分成两类：<strong>直接通信</strong>和<strong>间接通信</strong>。在直接通信中，通信的进程一方需要显式地标识另一方。例如，<code>Send(P,message)</code> 代表向 $P$ 进程发送一则消息；<code>Recv(Q, message)</code> 代表从 $Q$ 进程接收一则消息。直接通信下连接的建立是自动的，在具体交互时通过标识的名称完成。这就意味着，一个连接会唯一地对应一对进程。连接本身可以是单向的，也可以是双向的。</p>
-<p>在间接通信中，消息传递通过一个中间的信箱来完成。每个信箱有其唯一的标识符，而进程间通过同一个信箱来交换消息。也就是说，进程间连接的建立发生在共享一个信箱时。而每对进程可以通过共享多个信箱来建立多个连接。连接同样可以时单向的或双向的。</p>
-<h2 id="权限检查"><a href="#权限检查" class="headerlink" title="权限检查"></a>权限检查</h2><p>进程间的通信通常依赖于一套权限检查的机制来保证连接的安全性。在如 Linux 这样的宏内核系统中，通常将安全检查机制和文件的权限检查机制结合在一起。一个进程和其他进程通信，必须要通过权限的检查。例如，seL4 等微内核系统中的 Capability 机制，会将所有的通信连接抽象成一个个的内核对象。而每个进程对内核对象的访问权限由 Capability 来刻画。在宏内核系统中，如 Linux 中，通常会复用其有效用户/有效组的文件权限，以刻画进程对某个连接的权限。</p>
-<h2 id="命名服务"><a href="#命名服务" class="headerlink" title="命名服务"></a>命名服务</h2><p>权限检查机制带来了安全性，但是权限如何分发呢？通常，权限的分发会通过一个用户态的服务——**命名服务(naming server)**来处理。命名服务进程则指代提供该服务的具体进程。</p>
-<p>命名服务就像一个全局看板，可以协调服务端进程和客户端进程之间的通信。简单来说，服务端进程可以将自己提供的服务告诉命名服务进程，例如文件系统进程可以注册一个“文件系统服务”。客户端进程可以去命名服务上查询当前服务，并选择自己希望建立连接的服务去尝试获取权限。具体是否分发权限给对应的客户端进程，是由命名服务和对应的服务端进程根据特定的策略来判断的，例如文件系统进程可能允许任意线程进行连接，一个数据库进程则可能需要客户端提供私钥签名的证书。使用命名服务有很多的好处，比如各个服务不再是内核中的 ID 等抽象的表示，而是对应用更加友好的“名字”。</p>
-<h1 id="宏内核系统中的-IPC"><a href="#宏内核系统中的-IPC" class="headerlink" title="宏内核系统中的 IPC"></a>宏内核系统中的 IPC</h1><p>一般来说，宏内核系统中 IPC 的方式主要有：管道、消息队列、信号量、共享内存、信号、套接字。</p>
-<h2 id="管道"><a href="#管道" class="headerlink" title="管道"></a>管道</h2><p><strong>管道（pipe）</strong>是宏内核场景下重要的进程间通信机制。正如其名，管道是两个进程间的一条通道，一端负责投递，一端负责接收。例如，我们执行 Linux 下的 shell 命令</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps aux | grep target</span><br></pre></td></tr></table></figure>
-<p>来查看是否含有关键字为 target 的进程在运行。这里其实有两个命令：ps 和 grep，通过 shell 的管道接口 |，将第一个命令的输出投递到一个管道中，而这条管道的出口则是第二个命令的输入。</p>
-<p>管道是单向的 IPC，内核中通常有一定的缓冲区来缓冲消息，而通信的数据（消息抽象）是字节流，需要应用自己去对数据进行解析。</p>
-<p>具体实现上，管道在 UNIX 系列的系统中会被当作一个文件。内核会为用户态提供代表管道的文件描述符，让其可以通过文件系统相关的系统调用来使用。管道的行为和 FIFO 队列非常像，最早传入的数据会被最先读出来。</p>
-<p>当一个进程尝试在输出端对一个空管道进行读取时，会有两种情况：如果系统发现还没有任何进程有这个管道的写端口，就会得到 EOF（End-of-File）；否则，进程会阻塞在这个系统调用上，直到数据到来。第一种情况发生的可能是，管道的两个端口在 UNIX 系列系统的内核中以两个独立的文件描述符存在的，写端口有可能被进程给主动关闭了。对于第二种情况，进程可以通过配置非阻塞来避免阻塞。</p>
-<h3 id="命名管道和匿名管道"><a href="#命名管道和匿名管道" class="headerlink" title="命名管道和匿名管道"></a>命名管道和匿名管道</h3><p>在经典的 UNIX 实现中，管道有两类：命名管道和匿名管道。主要区别在于它们的创建方式。匿名管道通过 <code>pipe</code> 的系统调用创建，在创建的同时进程会拿到读写的端口（两个文件描述符）。由于整个管道没有全局的“名字”，因此只能通过这两个文件描述符来使用它。这种情况下，通常结合 <code>fork</code> 的使用，即继承的方式来建立父子进程间的连接。例如，父进程创建好了一个管道，然后使用 <code>fork</code> 创建子进程。子进程会有用父进程的系统资源，也就有了该管道的读写端口，因此可以和父进程通过该管道进行通信。这种方式对于父子进程等有着创建关系的进程间通信比较方便，但是对于两个关系较远的进程就不太适用。</p>
-<p>命名管道通过 <code>mkfifo</code> 来创建，在创建时会指定一个全局的文件名，由这个文件名（例如 /tmp/namedpipe）来指代一个具体的管道。通过这种方式，只要两个进程通过一个相同的管道名进行创建（并且都拥有权限），就可以实现在任意两个进程间建立管道的通信连接。</p>
-<h2 id="System-V-消息队列"><a href="#System-V-消息队列" class="headerlink" title="System V 消息队列"></a>System V 消息队列</h2><p>相比于本文介绍的其他宏内核通信机制，  消息队列是唯一一个以消息为数据抽象的通信机制。应用可以通过消息队列来发送或接收消息，发送和接收的接口是由内核提供的。消息队列是一种非常灵活的通信方式，可以有多个发送者和多个接收者。并且在 Linux 中，消息队列中的每个消息都有其类型抽象，使得发送者和接受者可以根据消息的类型来选择性地处理消息。</p>
-<h3 id="消息队列的结构"><a href="#消息队列的结构" class="headerlink" title="消息队列的结构"></a>消息队列的结构</h3><p>消息队列在 Linux 内核中的实现形式是消息链表。当创建新的消息队列时，操作系统将在内核中新建一个消息链表，作为消息队列的内核对象。队列的消息有一个消息头部指针，即链表中的头结点，它指向队列中的第一个消息（或者为空）。每个消息都会有指向下一个消息的指针（或者为空）。</p>
-<p>在消息结构体中，除了指针外，就是消息的内容。消息的内容有两个部分：类型和数据。数据是一段内存数据，和管道中的字节流类似。类型是用户态程序为每个消息指定的。在消息队列的设计中，内核不需要知道类型的语义，仅仅是保存，以及基于类型进行简单的查找。</p>
-<h3 id="消息队列的基本操作"><a href="#消息队列的基本操作" class="headerlink" title="消息队列的基本操作"></a>消息队列的基本操作</h3><p>消息队列一般有四个基本操作：<code>msgget</code>、<code>msgsnd</code>、<code>msgrcv</code>、<code>msgctl</code>，这四个操作在 Linux 上被实现为系统调用。</p>
-<p><code>msgget</code> 允许进程获取已有的消息队列的连接，或者创建一个新的消息队列。只要有对应的权限，消息队列允许任意数量的进程连接到同一通信连接上（即同一队列上）。<br><code>msgctl</code> 可以控制和管理一个消息队列，如修改消息队列的权限信息或删除消息队列。<br><code>msgsnd</code> 可以往消息队列上发送消息，<code>msgrcv</code> 可以从消息队列上接收消息。多个进程可以同时往消息队列上发送和从消息队列上接收消息。大部分情况下这两个过程是非阻塞的：对发送者来说，只要队列有空闲的空间就可以向其发送消息；对接收者来说，只要队列中有未读消息就可以从队列中读取消息。如果发送消息时队列中没有空间或者读取消息时队列中没有消息可以读，默认的操作是阻塞进程，直到有空间腾出或者有新的消息到达。</p>
-<h3 id="Linux-中的消息队列"><a href="#Linux-中的消息队列" class="headerlink" title="Linux 中的消息队列"></a>Linux 中的消息队列</h3><p>在 Linux 中，一个消息队列如果被创建，除非显式地将其删除，否则其生命周期是和内核一致的。其次，消息队列的内存空间是有限制的，因此消息队列并不适合传递长消息，一般建议用共享内存来传递长消息。最后，消息在用户态和内核态之间传递，会有内存拷贝的开销。</p>
-<h2 id="System-V-信号量"><a href="#System-V-信号量" class="headerlink" title="System V 信号量"></a>System V 信号量</h2><p>和其他 IPC 机制传递数据的方案不同，信号量在实际的使用中主要是用作进程间的“同步”。有些场景下，多个进程需要依赖于进程间通信来同步彼此的状态，如执行的顺序等。信号量本身能传递的数据量很少，一般来说仅有一个共享的整形计数器，该计数器通常由内核维护，而对信号量的操作则需要经过内核系统调用。</p>
-<p>信号量的主要操作有两个原语：P 和 V。P 是荷兰语 Probeer（尝试）的缩写，表示尝试一个操作（在信号量中通常是将一个计数器减 1），该操作的失败会将该进程切换到阻塞状态，直到其他进程执行了 V 操作。<br>V 是荷兰语 Verhoog（增加）的缩写，在信号量中是将一个计数器加 1。V 可能会唤醒一个因 P 操作而陷入阻塞的进程。P 和 V 的操作都是在信号量结构上进行的，该结构会封装一个计数器。</p>
-<p>信号量的一个简单的使用是将其值的范围限定在 0 到 1 之间。但执行 P 原语时，会将计数器减 1；当执行 V 原语时，会将计数器加 1。如果计数器被 P 原语减为负数，则会阻塞该进程，直到其他进程使用 V 原语将计数器修改成非负数时，则会唤醒该进程。</p>
-<p>信号量一种用途是同步进程之间的操作。例如将一个信号量限定在 0 到 1 之间，初始值为 0。进程 A 在执行之前调用 P 原语，此时信号量的计数器减去 1，变成 -1，进程 A 被阻塞。进程 B 在执行结束后使用 V 原语，将信号量的计数器增加为 0，此时进程 A 被唤醒。这样，我们就使用一个信号量，保证进程 A 和 B 的执行顺序为先 B 后 A。</p>
-<p>信号量的另一种典型用途是控制共享资源的访问，此时 P 原语和 V 原语必须成对出现，在获取资源时调用 P 原语，在释放资源时调用 V 原语。例如，某个资源对应的信号量范围在 0 到 1 之间，初始值为 1。进程 A 先访问该资源，调用 P 原语，将信号量的计数器修改为 0，成功获取资源并执行。进程 B 随后访问该资源，调用 P 原语，信号量的计数器修改为 -1，此时进程 B 被阻塞。过后一段时间，进程 A 释放资源，调用 V 原语，将进程 B 唤醒，进程 B 此时获取了资源并开始执行。进程 B 执行完成后，调用 V 原语释放资源，此时信号量的计数器恢复为 1。</p>
-<h2 id="System-V-共享内存"><a href="#System-V-共享内存" class="headerlink" title="System V 共享内存"></a>System V 共享内存</h2><p>对于消息队列、管道、信号量等机制，内核都提供了完整的接口。虽然这些完善的抽象方便了用户进程的使用，但是其中涉及的数据拷贝和控制流转移等处理逻辑影响了这些抽象的性能。共享内存将两个（或多个）进程中的一片虚拟地址空间映射到同一片物理地址空间上，当映射建立完成后，内核就不再参与进程间的通信。这样，在通信时就不存在将数据从用户态内存拷贝到内核态内存的过程，也就增强了 IPC 的性能。因此，共享内存适用于需要传递长消息的场景。</p>
-<h2 id="信号"><a href="#信号" class="headerlink" title="信号"></a>信号</h2><p>管道、消息队列、共享内存等方式主要关注数据传输的设计，而<strong>信号(signal)<strong>的一个特点是</strong>单向的事件通知</strong>。信号量也有通知能力，但是需要进程主动查询计数器或者陷入阻塞状态等待通知。使用信号，一个进程可以随时发送一个事件到特定的进程、线程或进程组等。接收事件的进程不需要阻塞等待该事件，内核会帮助其切换到对应的处理函数中响应信号事件，并且在处理完成后恢复之前的上下文。</p>
-<p>信号传递的信息很短，只有一个编号（信号类型）。例如我们在 Shell 中使用 Ctrl + C 中止一个运行中的进程，就是 Shell 发出了一个 <code>SIGINT</code> 信号，使得进程中止。</p>
-<p>在通信的场景下，一个进程会为一些特定的信号注册处理函数。当进程接收到对应的信号时，内核会自动地将用户的控制流切换到对应的处理函数中。</p>
-<p>在 Linux 中，其早期有 31 个信号（1 ~ 31 号），后续 POSIX 标准又引入了编号从 32 到 64 的其他信号。Linux 传统信号被称为常规信号，POSIX 引入的信号称为实时信号。一个进程如果多次收到某个常规信号，内核只会记录一次，而多个相同的实时信号则不会被丢弃。</p>
-<h3 id="发送信号"><a href="#发送信号" class="headerlink" title="发送信号"></a>发送信号</h3><p>信号的发送者可以是用户态进程，也可以是内核。一个用户态进程可以通过调用内核提供的系统接口，如</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">kill(<span class="keyword">pid_t</span> pid, <span class="keyword">int</span> sig)</span><br><span class="line">tgkill(<span class="keyword">int</span> tgid, <span class="keyword">int</span> tid, <span class="keyword">int</span> sig)</span><br></pre></td></tr></table></figure>
-<p>向进程或线程发送特定的信号。内核通过不同的系统调用及其参数，来确定接收信号的目标进程或线程，将信号事件添加到其等待队列上。添加操作需要区别实时信号和常规信号，当发送的信号是非实时的信号，并且现在还未处理该信号时，内核会忽略掉这个事件。</p>
-<h3 id="处理信号"><a href="#处理信号" class="headerlink" title="处理信号"></a>处理信号</h3><p>Linux 提供了一个 <code>sigprocmask</code> 系统调用，允许用户设置队特定信号的阻塞状态。当一个信号被阻塞后，Linux 将不会再触发这个信号的响应函数，直到该信号被解除阻塞。信号被阻塞并不会影响其被添加到等待队列上，当进程解除了对这个信号的阻塞时，其可能需要处理在阻塞期间收到的信号。很多重要的信号是不能被阻塞的，例如 SIGKILL。</p>
-<p>在 Linux 等 UNIX 系统的设计中，信号得到处理的时机通常是内核执行完异常、中断或系统调用等返回到用户态的时刻，此时内核会检查一个状态位来判断是否有信号需要处理。如果有，则先去处理该信号事件。Linux 提供了 <code>signal</code>、<code>sigaction</code> 等系统调用，允许用户为特定的信号注册一个用户态响应函数。</p>
-<h3 id="可重入处理函数"><a href="#可重入处理函数" class="headerlink" title="可重入处理函数"></a>可重入处理函数</h3><p>在信号处理函数执行的过程中，如果其他进程又发送了一个该信号事件过来，并且当前进程由于中断等下陷到内核，那么当前进程可能会暂停当前信号处理函数的执行，并且重新切换到处理函数的开头去处理新的信号事件，然后再回到原来的地方继续执行原本的信号响应函数。这种嵌套需要信号处理函数是<strong>可重入</strong>的。简单来说，就是在信号处理的过程中，有可能会产生并发，并且调用的函数就是信号处理函数本身。假如此时在信号处理函数中使用了全局锁保护一段关键操作时，就有可能导致死锁：信号处理函数在第一次被调用时获得了全局锁，在进行到一半时又被从头执行，此时原本的信号处理函数没有释放获得的锁，因而新的处理函数无法获取全局锁，进而造成死锁的局面。</p>
-<p><strong>可重入（reentrant）</strong>函数允许多个任务并发使用，而不用担心共享数据的错误。一般来说，实现一个可重入函数有以下几个要求：</p>
-<ul>
-<li>不使用静态数据，或者静态数据都是只读的。</li>
-<li>尽量只使用本地数据。</li>
-<li>在必须使用全局共享数据的情况下，需要保护对全局数据的访问（也需要避免死锁）。</li>
-<li>避免在函数中修改自己的代码。</li>
-<li>不调用不可重入的函数，很多库函数的实现（例如 <code>malloc</code>）是不可重入的，需要注意。</li>
-</ul>
-<h2 id="Socket"><a href="#Socket" class="headerlink" title="Socket"></a>Socket</h2><p>**套接字(Socket)**是一种既可用于本地，又可跨网络使用的通信机制。因此应用程序可以使用 Socket 来实现本地进程间的通信和跨机器的通信。在进行本地通信时，通信双方通常使用本地回环地址（127.0.0.1），然后各自绑定在不同的端口上。操作系统网络协议栈会识别回环地址，将通信消息转发到目标端口对应的进程。此外，也可以用本地文件系统的一个路径作为地址，这通常被叫做 UNIX domain socket。使用套接字通常有两种协议，TCP 和 UDP。TCP 传输可以保证数据的正确性，UDP 则在传输性能上更佳。</p>
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a target="_blank" rel="noopener" href="https://book.douban.com/subject/35208251/">《现代操作系统：原理与实现》</a>，陈海波，夏虞斌等著，机械工业出版社</p>
-
-          
+          在现代操作系统中，使用多个进程来实现应用和系统是一种广泛使用的方法。进程间通信(Inter-Process Communication) 是多进程协作的基础。
+一般来说，IPC 至少需要两个进程参与。根据信息流动的方向，这两方可以被称为发送者和接收者。在实际使用中，IPC 常被用于服务调用，因此参与
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/03/23/OS-IPC/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -1051,40 +1132,15 @@
       
         
           
-            <h1 id="什么是事务"><a href="#什么是事务" class="headerlink" title="什么是事务"></a>什么是事务</h1><p><strong>事务(transaction)</strong> 是访问并可能更新各种数据项的一个程序执行的单元，其由形如 <code>begin transaction</code> 和 <code>end transaction</code> 的语句界定，事务由 <code>begin transaction</code> 和 <code>end transaction</code> 之间执行的全体操作组成。对于事务，数据库系统必须保证事务的正确执行——要么执行整个事务，要么属于该事务的操作一个也不执行。因此，如果一个事务开始执行，但是由于某些原因失败，则事务对数据库造成的任何可能的修改都要撤销。这种“全或无”的特性成为 **原子性(atomicity)**。</p>
-<p>由于事务是一个单一的单元，它的操作不能被其他不属于该事务的数据库操作分隔开，数据库系统必须采取特殊处理来确保事务正常执行而不被来自并发操作的数据库语句所干扰，这种特性叫做**隔离性(isolation)**。</p>
-<p>在事务执行成功后，即使数据库系统崩溃，事务操作的结果也必须是持久的。这种特性叫做**持久性(durability)**。</p>
-<p>此外，还有一种特性叫做**一致性(consistency)**。这种特性强调事务在开始执行时数据库是一致的，结束时数据库的状态仍然是一致的。这种一致性可以理解为数据完整性约束（如主码约束、参照完整性等），但实际上一致性的内涵更加复杂，详细的介绍可以参考<a target="_blank" rel="noopener" href="https://www.zhihu.com/question/31346392">如何理解数据库事务中的一致性概念</a>。</p>
-<p>上面的四种特性可以缩写为 ACID，其中 AID 都是数据库系统的特征，而 C 的实现则是于定义事务具体内容的程序员的职责。</p>
-<p>如果一个事务没有成功地执行完成，那么我们称这个事务 <strong>中止(aborted)</strong> 了。因为事务有原子性，因此中止事务对数据库的状态不能产生影响，其已执行的指令对数据库状态造成的影响必须撤销。如果一个中止事务造成的变更被撤销，我们就说事务**已回滚(rolled back)<strong>。恢复机制负责管理事务中止。<br>成功完成的事务称为</strong>已提交(commited)<strong>，我们不能通过中止它来撤销其造成的影响。撤销已提交事务所造成的影响的唯一方法是执行一个</strong>补偿事务(compensating transaction)**。补偿事务通常由用户来创建。</p>
-<h1 id="事务的状态"><a href="#事务的状态" class="headerlink" title="事务的状态"></a>事务的状态</h1><p>事务的状态有五种：</p>
-<ul>
-<li>**活动的(active)**：初始状态，事务执行时处于这个状态。</li>
-<li>**部分提交的(partially commited)**：最后一条语句执行后。</li>
-<li>**失败的(failed)**：发现正常的执行不能继续后。</li>
-<li>**中止的(aborted)**：事务回滚并且数据库已恢复到事务开始执行前的状态后。</li>
-<li>**提交的(commited)**：成功完成后。</li>
-</ul>
-<img src="/2021/03/21/DB-transaction/事务状态.png" width="45%">
-
-<p>如果一个事务是提交的或者中止的，它称为已经结束的(terminated)。当一个事务执行完其最后一条语句，它就进入了部分提交状态。此时，事务已经完成执行，但是由于实际输出可能仍临时驻留在内存中，因此一个硬件故障就可能阻止其成功完成，事务仍有可能中止。<br>接着数据库系统往磁盘上写入足够的信息，确保即使出现故障时事务所做的更新也能在系统重启后重新创建。当最后一条这样的信息写完后，事务就进入提交状态。</p>
-<p>当系统判定事务不能继续正常执行后（例如由于硬件或逻辑错误），事务就进入失败状态。这种事务必须回滚。这样，事务就进入中止状态。此时，系统有两种选择：</p>
-<ul>
-<li><strong>重启(restart)</strong> 事务，但是这仅当引起事务中止的是硬件错误或不是由事务内部逻辑所产生的软件错误时。</li>
-<li><strong>杀死(kill)</strong> 事务，这样做通常是由于事务的内部逻辑造成的错误，只有重写应用程序才能改正。</li>
-</ul>
-<h1 id="调度的可串行化"><a href="#调度的可串行化" class="headerlink" title="调度的可串行化"></a>调度的可串行化</h1><p>我们现在仅考虑两种操作：read 和 write。read 操作将数据从硬盘读到内存中，write 操作将数据从内存写回硬盘中。假设有多个事务，那么这多个事务的一组执行顺序称为一个<strong>调度</strong>。将多个事务串行地执行，即执行完事务 $T_k$ 再执行下一个事务 $T_{k+1}$，则这个调度为串行调度。我们重点关注一种叫做<strong>冲突可串行化</strong>的调度形式。假设有一个调度 $S$，其中含有分别属于 $I$ 和 $J$ 的两条连续指令 $Ins_i$ 与 $Ins_j(i\neq j)$。如果 $I$ 与 $J$ 引用不同的数据项，则交换 $I$ 和 $J$ 不会影响调度中任何指令的结果。然而，如果 $I$ 和 $J$ 引用相同的数据项 $Q$，则两者的顺序是重要的。因此需要考虑下面四种情况：</p>
-<ol>
-<li>**$I$ = read(Q), $J$ = read(Q)**。</li>
-<li>**$I$ = read(Q), $J$ = write(Q)**。</li>
-<li>**$I$ = write(Q), $J$ = read(Q)**。</li>
-<li>**$I$ = write(Q), $J$ = write(Q)**。</li>
-</ol>
-<p>第一种情况，$I$ 和 $J$ 的次序无关紧要，因为无论其次序如何，两者读到的数据总是一样的。<br>第二和第三种情况，$I$ 和 $J$ 的顺序会影响 read(Q) 的结果。<br>第四种情况 $I$ 和 $J$ 的顺序会影响最终硬盘中保留的 Q 的值。</p>
-<p>因此，只有 $I$ 和 $J$ 全为 read 指令时，两条指令的执行顺序才无关紧要。当 $I$ 和 $J$ 之间是第二到第四种情况时，我们称其是**冲突(conflict)**的。</p>
-<p>假设在事务 $T_1$ 和 $T_2$ 中，分别有 read(A)、read(B)、write(A)、write(B) 的指令，显然由上面知 read(A) 与 write(B)、write(B) 与 read(A) 是不冲突的。假设我们交换两个事务之间非冲突指令的执行顺序，使得调度 $S$ 变成了 $S’$，则我们称 $S$ 与 $S’$ 是<strong>冲突等价</strong>的。如果一个调度 $S$ 和一个串行调度冲突等价，则称调度 $S$ 是冲突可串行化的。</p>
-
-          
+          什么是事务事务(transaction) 是访问并可能更新各种数据项的一个程序执行的单元，其由形如 begin transaction 和 end transaction 的语句界定，事务由 begin transaction 和 end transaction 之间执行的全体操作组成。对于事务，数
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/03/21/DB-transaction/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -1266,64 +1322,15 @@
       
         
           
-            <h1 id="进程"><a href="#进程" class="headerlink" title="进程"></a>进程</h1><p>为了管理操作系统中各种各样的程序，操作系统定义了进程（Process）的抽象：每个进程都对应于一个运行中的程序。为了使得多个进程可以同时执行，操作系统提出了上下文切换机制，通过保存和恢复进程在运行过程中的状态（即上下文），使进程可以暂停、切换、恢复，从而实现了 CPU 资源的共享。同时，使用虚拟内存机制，为每个进程都提供了独立的虚拟地址空间。</p>
-<h2 id="进程状态"><a href="#进程状态" class="headerlink" title="进程状态"></a>进程状态</h2><p>为了对进程进行管理，首先需要定义进程的状态。一般来说，进程有以下几种状态。</p>
-<ul>
-<li><strong>新生状态</strong>：此时进程刚刚被创建出来，尚未完成初始化，不可以被调度。当完成初始化后，迁移至预备状态。</li>
-<li><strong>预备状态</strong>：此时进程可以被调度，但是还没有被调度器选择。当被调度器选择时，迁移至运行状态。</li>
-<li><strong>运行状态</strong>：此时进程正在 CPU 上运行。当调度器中断其执行并将其放回调度队列中时，其迁移至预备状态；当其运行结束时，迁移至终止状态；当其需要等待外部事件时，迁移至阻塞状态。</li>
-<li><strong>阻塞状态</strong>：此时进程需要等待外部事件（例如某个 I/O 请求的完成），暂时无法被调度。</li>
-<li><strong>终止状态</strong>：此时进程已经完成了执行，不会再被调度。</li>
-</ul>
-<h2 id="进程的内存空间布局"><a href="#进程的内存空间布局" class="headerlink" title="进程的内存空间布局"></a>进程的内存空间布局</h2><p>如图所示，进程拥有独立的虚拟内存空间。</p>
-<img src="/2021/03/12/OS-process-and-thread/进程内存布局.png" width="20%">
-
-<ul>
-<li><strong>用户栈</strong>：用户栈保留了进程需要的各种临时数据，其扩展方向是自顶向下，栈底在高地址，栈顶在低地址。当有数据压入栈时，栈顶向低地址扩展。</li>
-<li><strong>代码库</strong>：进程执行需要的共享代码库（比如 libc），其被标记为只读。</li>
-<li><strong>用户堆</strong>：堆管理的时动态分配的内存，和栈相反，其扩展方向是自底向上。</li>
-<li><strong>数据与代码段</strong>：数据段主要保存的是全局变量的值，代码段保存的是进程执行所需的代码。</li>
-<li><strong>内核部分</strong>：每个进程的虚拟地址空间里都映射了相同的内核内存。当进程在用户态时，内核内存对其不可见；只有进程进入内核态时，才能访问内核内存。</li>
-</ul>
-<p>在 Linux 中，可以使用 <code>cat /proc/PID/maps</code> 来查看某个进程的内存布局。</p>
-<h2 id="进程控制块"><a href="#进程控制块" class="headerlink" title="进程控制块"></a>进程控制块</h2><p>在内核中，每个进程都通过一个数据结构来描述其状态，这个数据结构成为进程控制块（Process Control Block，PCB）。在不同的操作系统中，PCB 所包含的内容也不一样。在 Linux 4.14 中 PCB 对应的数据结构 task_struct 所包含的部分内容如下</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">task_struct</span> &#123;</span></span><br><span class="line">  <span class="comment">// 进程状态</span></span><br><span class="line">  <span class="keyword">volatile</span> <span class="keyword">long</span> state;</span><br><span class="line">  <span class="comment">// 虚拟内存状态</span></span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">mm_struct</span> *<span class="title">mm</span>;</span></span><br><span class="line">  <span class="comment">// 进程标识符</span></span><br><span class="line">  <span class="keyword">pid_t</span> pid;</span><br><span class="line">  <span class="comment">// 进程组标识符</span></span><br><span class="line">  <span class="keyword">pid_t</span> tgid;</span><br><span class="line">  <span class="comment">// 进程间关系</span></span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">task_struct</span> __<span class="title">rcu</span> *<span class="title">parent</span>;</span></span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">children</span>;</span></span><br><span class="line">  <span class="comment">// 打开的文件</span></span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">files_struct</span> *<span class="title">files</span>;</span></span><br><span class="line">  <span class="comment">// 其他状态（如上下文）</span></span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>进程的上下文（context）包括进程运行时的寄存器状态，其能够用于保存和恢复一个进程在处理器上的运行状态。当操作系统需要切换当前执行的进程时，就会使用上下文切换机制（context switch）。</p>
-<h2 id="Linux-中的进程"><a href="#Linux-中的进程" class="headerlink" title="Linux 中的进程"></a>Linux 中的进程</h2><h3 id="进程的创建"><a href="#进程的创建" class="headerlink" title="进程的创建"></a>进程的创建</h3><p>在 Linux 中进程的创建一般使用 fork 接口，从已有的进程中“分裂”出来。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">pid_t</span> <span class="title">fork</span><span class="params">(<span class="keyword">void</span>)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>fork 接口非常简单，不接收任何参数，返回的时当前进程的 PID。当一个进程调用 fork 时，操作系统会创建一个和该进程几乎一模一样的新进程。当 fork 刚刚完成时，两个进程的内存、寄存器、程序计数器等状态完全一致，但是这两个线程相互独立，拥有独立的虚拟内存空间和不同的 PID。在 fork 结束以后他们会独立执行，互不干扰。</p>
-<p>在调用 fork 之后父子进程之间存在大量的共享，因此会造成很多不确定的行为。例如，假如父进程在 fork 之前打开了一个文件，fork 结束以后，这两个进程都会持有这个文件的文件描述符（File Descriptor）。文件描述符是操作系统提供的对于某一文件引用的抽象，会记录关于文件的一些信息，例如当前位置的偏移量。因此，假如这两个父子进程同时操作该文件，有可能会导致冲突。</p>
-<p>除了简单的 fork 接口，Linux 中还有 clone 接口，其拓展了 fork。关于 fork 和 clone 的详细使用方法，可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/gatieme/article/details/51417488">Linux中fork，vfork和clone详解（区别与联系）</a>。</p>
-<h3 id="进程管理"><a href="#进程管理" class="headerlink" title="进程管理"></a>进程管理</h3><h4 id="进程树"><a href="#进程树" class="headerlink" title="进程树"></a>进程树</h4><p>在 Linux 中，由于进程都是通过 fork 创建的，操作系统会以 fork 作为线索记录进程之间的关系。每个进程的 task_struct 都会记录自己的父进程与子进程，进程之间因此形成了进程树的结构。</p>
-<img src="/2021/03/12/OS-process-and-thread/进程树.png" width="55%">
-
-<p>处于进程树根节点的是 init 进程，它是操作系统创建的第一个进程，之后所有的进程都是由它直接或间接 fork 出来的。</p>
-<h4 id="进程间监控：wait"><a href="#进程间监控：wait" class="headerlink" title="进程间监控：wait"></a>进程间监控：wait</h4><p>在 Linux 中，进程可以使用 wait 操作来对其子进程进行监控。其由多个变种，这里介绍 <code>waitpid</code></p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">pid_t</span> <span class="title">waitpid</span><span class="params">(<span class="keyword">pid_t</span> pid, <span class="keyword">int</span> *wstatus, <span class="keyword">int</span> options)</span></span>;</span><br></pre></td></tr></table></figure>
-<p>其中第一个参数是需要等待的子进程 id，第二个参数会用来保存子进程状态，最后一个参数包含一些选项。父进程调用 <code>waitpid</code> 对子进程进行监控，如果子进程已经退出，那么 waitpid 会立即返回，并设置 status 变量的值；如果子进程还没有退出，则父进程会被阻塞，并等待子进程退出。</p>
-<p>在 Linux 中，wait 操作不仅起到了监控的作用，还起到了回收已经结束的子进程和释放资源的作用。如果父进程没有调用 wait 操作，就算子进程已经终止了，它所占用的资源也不会完全释放，我们将这种进程成为<strong>僵尸进程</strong>。内核会为僵尸进程保留其进程描述符（PID）和终止时的信息（waitpid 中的 status），以便父进程在调用 wait 时可以监控子进程的状态。不过，如果父进程退出了，那么子进程的信息就不会再被父进程使用，也就没有必要继续保留它们了。此时，所有由父进程创建的僵尸进程都会被内核的第一个进程 init 通过调用 wait 的方式回收。</p>
-<p>如果一个父进程调用了一个或若干个子进程，但是父进程在子进程结束之前就已经结束了，那么这些子进程就被成为<strong>孤儿进程</strong>，这些进程会被 init 进程收养。</p>
-<h4 id="进程组和会话"><a href="#进程组和会话" class="headerlink" title="进程组和会话"></a>进程组和会话</h4><p>为了方便对进程进行管理，内核还定义了进程组和会话的概念。会话和进程组主要用于 Shell 环境中的进程管理。</p>
-<p>进程组是进程的集合，可以由一个或多个进程组成。在默认的情况下，父进程和子进程属于同一个进程组。如果子进程想要脱离当前进程组，可以通过 <code>setpgid</code> 创建一个新的进程组或者移入一个已有的进程组。进程组的一大作用是体现在对信号的处理上，应用程序可以调用 <code>killpg</code> 向一个进程组发送信号，这个信号会被发给该进程组的所有进程。</p>
-<p>会话是进程组的集合，可以由一个或多个进程组组成。会话将进程组根据执行状态分为前台进程组和后台进程组。</p>
-<h1 id="线程"><a href="#线程" class="headerlink" title="线程"></a>线程</h1><p>在早期的操作系统中，进程是调度的最小单元。随着程序并行性的提高，操作系统需要对程序进行更加细粒度的调度，于是就产生了线程（thread）的概念。同一进程下的所有线程共享进程的地址空间，但又各自保留运行时所需的状态（上下文）。在现代操作系统中，线程取代了进程，成为了操作系统调度的最小单位。</p>
-<h2 id="线程内存布局"><a href="#线程内存布局" class="headerlink" title="线程内存布局"></a>线程内存布局</h2><img src="/2021/03/12/OS-process-and-thread/多线程内存布局.png" width="20%">
-
-<p>上图是包含三个线程的进程地址空间，其有两个重要特征：</p>
-<ul>
-<li><strong>分离的内核栈和用户栈</strong>：进程为每个线程都准备了不同的栈，供它们存放临时数据。在内核中，每个线程也有对应的内核栈。</li>
-<li><strong>共享的其他区域</strong>：除了栈，进程中的所有其他区域都由该进程的所有线程共享，包括堆、数据段、代码段等。</li>
-</ul>
-<h2 id="用户态线程和内核线程"><a href="#用户态线程和内核线程" class="headerlink" title="用户态线程和内核线程"></a>用户态线程和内核线程</h2><p>根据线程是由用户应用创建还是内核创建，可以将其分为两类：用户态线程和内核态线程。内核态线程由内核创建，受操作系统调度器管理。用户态线程则是应用创建的，内核不可见，不受操作系统调度器管理。用户态线程中与内核相关的功能（如系统调用）需要内核线程协助才能完成。为了使用户态线程与内核态线程相互协作，操作系统会建立两者之间的关系。一般来说，主要由三种模型：多对一、一对一和多对多。</p>
-<ul>
-<li><strong>多对一</strong>：该模型中一个内核线程服务多个用户态线程，每次只能有一个用户态线程进入内核，其他需要内核服务的线程将被阻塞。随着多核机器的普及，这种模型已不再使用。</li>
-<li><strong>一对一</strong>：该模型中每个用户态线程都有单独的内核态线程，其比一对一模型具有更好的拓展性。这种模型的缺点是，随着用户态线程的增多，创建内核态线程的开销会随之增大。因此，在实现该模型的操作系统中，都会限制用户态线程的总数量。Linux 和 Windows 使用的都是这种模型。</li>
-<li><strong>多对多</strong>：多对多模型将 $N$ 个用户态线程映射到 $M$ 个内核态线程上，其中 $N&gt;M$。这种模型既减轻了多对一模型中因为内核线程数量过少而导致的阻塞问题，也解决了一对一模型中因为内核态线程过多而导致的性能问题。但是这种模型会使得内核态线程的管理变得复杂。macOS 和 iOS 使用的面向用户体验的调度器 GCD 采用了这一种模型。<h2 id="线程接口"><a href="#线程接口" class="headerlink" title="线程接口"></a>线程接口</h2><h3 id="创建"><a href="#创建" class="headerlink" title="创建"></a>创建</h3>在 POSIX 线程库中，使用 <code>pthread_create</code> 函数来创建线程。 其接受四个参数，分别是线程的引用、线程的属性、线程开始运行的函数、线程运行的参数。<h3 id="退出"><a href="#退出" class="headerlink" title="退出"></a>退出</h3>在 POSIX 线程库中，使用 <code>pthread_exit</code> 函数来退出线程。但是这个调用并不是必要的，当线程运行结束后，<code>pthread_exit</code> 会被隐式地调用。<h3 id="合并"><a href="#合并" class="headerlink" title="合并"></a>合并</h3>在多线程场景中，有可能会出现几个线程之间相互依赖的情况。因此，线程库中提供了合并（join）操作的函数 <code>pthread_join</code>，其允许一个线程等待另一个线程的执行，并获取其执行的结果。<h3 id="挂起"><a href="#挂起" class="headerlink" title="挂起"></a>挂起</h3>pthread 中没有专门挂起的函数，此时可以使用 <code>sleep</code> 函数完成挂起操作。调用该函数后，该线程会处于阻塞状态，等到睡眠结束后将转为预备状态，但是此时并不一定会被调度器选择，因此在睡眠结束之后并不一定会立即被执行。<br>还有一种挂起是等待某种事件，线程在挂起之前指明等待的具体时间。在 pthreads 中，对应的接口是 <code>pthread_cond_wait</code>。<h1 id="纤程"><a href="#纤程" class="headerlink" title="纤程"></a>纤程</h1>由于主流的操作系统都使用一对一的线程模型，用户态线程和内核态线程具有一对一的关系，因此可以认为用户态线程的执行几乎完全收到操作系统调度器的管理。<br>但是，随着程序越来越复杂，应用的设计者可能更能优化调度的性能。因此，操作系统开始提供更多对用户态线程，即<strong>纤程</strong>的支持。因为纤程不是操作系统调度的单位，纤程的调度和切换不需要通过操作系统。更多关于纤程的介绍，可以参考<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Fiber_(computer_science)">Wikipedia</a><h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1>《现代操作系统：原理与实现》第 5 章，陈海波，夏虞斌等著</li>
-</ul>
-
-          
+          进程为了管理操作系统中各种各样的程序，操作系统定义了进程（Process）的抽象：每个进程都对应于一个运行中的程序。为了使得多个进程可以同时执行，操作系统提出了上下文切换机制，通过保存和恢复进程在运行过程中的状态（即上下文），使进程可以暂停、切换、恢复，从而实现了 CPU 资源的共享。同时，使用虚拟
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/03/12/OS-process-and-thread/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -1505,46 +1512,18 @@
       
         
           
-            <h1 id="虚拟内存"><a href="#虚拟内存" class="headerlink" title="虚拟内存"></a>虚拟内存</h1><p>为了让每个应用都可以高效又安全地使用物理内存，现代操作系统中会在应用程序和物理内存之间加入一层新的抽象：虚拟内存。应用程序在编写时仅考虑虚拟内存，CPU 在运行时将应用程序的虚拟内存地址翻译成物理内存地址，操作系统负责设置虚拟地址与物理地址之间的映射。</p>
-<p>虚拟内存的设计有以下三个目标：</p>
-<ul>
-<li>高效性：虚拟内存不能在程序运行过程中造成明显的性能开销，且虚拟内存抽象也不应该占用过多的物理内存资源。</li>
-<li>安全性：虚拟内存应使得不同应用程序之间的内存相互隔离。</li>
-<li>透明性：应用程序开发者在变成时无需考虑虚拟内存抽象。<h2 id="虚拟内存的翻译"><a href="#虚拟内存的翻译" class="headerlink" title="虚拟内存的翻译"></a>虚拟内存的翻译</h2>在使用虚拟内存的情况下，CPU 取指令时发出的时指令的虚拟地址，该虚拟地址被内存管理单元（Memory Management Unit，MMU）翻译为对应的物理地址，包含改物理地址的内存读请求被发送到物理内存设备，然后物理内存设备把该物理地址对应的内容发送给 CPU。为了加速翻译，现代 CPU 都引入了转址旁路缓存（Translation Lookaside Buffer，TLB）。</li>
-</ul>
-<p>MMU 将虚拟地址翻译为物理地址的主要机制有两种：分段机制与分页机制，下面分别介绍。</p>
-<h3 id="基于分段的虚拟地址"><a href="#基于分段的虚拟地址" class="headerlink" title="基于分段的虚拟地址"></a>基于分段的虚拟地址</h3><p>在分段机制中，操作系统以“段”的形式管理物理内存。CPU 访问虚拟内存空间中某一个段时，MMU 会通过查询<strong>段表</strong>得到该段对应的物理地址区域。</p>
-<img src="/2021/03/11/OS-memory/虚拟内存翻译-段.png" width="65%">
+          虚拟内存为了让每个应用都可以高效又安全地使用物理内存，现代操作系统中会在应用程序和物理内存之间加入一层新的抽象：虚拟内存。应用程序在编写时仅考虑虚拟内存，CPU 在运行时将应用程序的虚拟内存地址翻译成物理内存地址，操作系统负责设置虚拟地址与物理地址之间的映射。
+虚拟内存的设计有以下三个目标：
 
-<p>虚拟地址由两个部分构成：高位的段号和低位的段内偏移。在翻译时，MMU 首先通过段表基地址寄存器找到段表的位置，结合虚拟地址中的段号，找到对应物理段的信息；然后取出该段的起始地址（物理地址），加上待翻译虚拟地址中的段地址（偏移量），就能够得到最终的物理地址。</p>
-<p>在分段机制下，不仅虚拟内存空间被划分成不同的段，物理内存也以段为单位进行分配。这种段式分配方式容易导致在物理内存中出现外部碎片，即在段与段之间留下碎片空间，从而造成物理内存资源利用率的降低。</p>
-<h3 id="基于分页的虚拟地址"><a href="#基于分页的虚拟地址" class="headerlink" title="基于分页的虚拟地址"></a>基于分页的虚拟地址</h3><h4 id="虚拟地址翻译"><a href="#虚拟地址翻译" class="headerlink" title="虚拟地址翻译"></a>虚拟地址翻译</h4><p>在 x86-64 架构之后，基于分页机制的虚拟内存已经成为主流。分页机制的思想是将虚拟内存地址空间划分成连续的、等长的虚拟页（显著区别于分段机制下不同长度的段），同时物理内存也被划分为连续的、等长的物理页。虚拟页和物理页的页长固定且相等，操作系统可以很方便地为每个应用程序构造<strong>页表</strong>，即虚拟页到物理页的映射关系表。类似于分段机制下的虚拟地址，分页机制下的虚拟地址分为两个部分：高位的页号和低位的页内地址。</p>
-<img src="/2021/03/11/OS-memory/虚拟内存翻译-页.png" width="65%">
-
-<p>在翻译时，MMU 首先解析得到虚拟地址中的虚拟页号，然后通过页表基地址寄存器找到页表，查询该虚拟页号对应的物理页号，最后用该物理页号对应的物理页的起始地址加上虚拟地址中的页内偏移得到最终的物理地址。</p>
-<p>在分页机制下，连续的虚拟页可以对应离散的物理页，因此可以实现物理内存资源的离散分配。并且，分页机制按照固定页大小分配物理内存，可以有效避免分段机制中的外部碎片。</p>
-<h4 id="多级页表"><a href="#多级页表" class="headerlink" title="多级页表"></a>多级页表</h4><p>页表是分页机制中的关键部分，如果仅使用一张简单的页表来记录映射关系，那么对于 64 位的虚拟地址空间，假设一个页的大小为 4 KB，页表中每一项的大小为 8 字节，那么这个页表的大小就是 $2^{64}/4 KB * 8$ 字节，即 33554432 GB。显然，这是不可接受的。因此，人们又设计出了多级页表来节省页表所占用的空间。</p>
-<img src="/2021/03/11/OS-memory/虚拟内存翻译-多级页.png" width="65%">
-
-<p>在使用多级页表时，一个虚拟地址中仍然可以划分为页号和页内偏移量。但是页号被进一步划分成 k 个部分，每一个部分对应着其在每一级页表中所对应的项。在多级页表中，除了最后一级页表中的项是映射到物理页，其余的页表都映射到下一级页表上。注意，在 0 到 k - 1 级页表中，其条目可以为空，该空条目的子页表也就不存在。换句话说，多级页表允许在整个页表结构中出现空洞，而单级页表则不允许。在实际使用中，大多数虚拟地址空间都是未分配的，因此多级页表可以部分创建，进而节省内存空间。</p>
-<h4 id="TLB"><a href="#TLB" class="headerlink" title="TLB"></a>TLB</h4><p>多级页表可以压缩页表的大小，但是会增加虚拟地址翻译的延迟。所以人们在 MMU 中加入了转址旁路缓存（TLB）来加速翻译的过程。TLB 相当于一个哈希表，将虚拟页号映射到物理页号上。考虑虚拟地址 VA，其在应用 A 和应用 B 中所对应的物理页是不同的，因此操作系统在切换应用程序时需要刷新 TLB 。</p>
-<h2 id="虚拟内存的管理"><a href="#虚拟内存的管理" class="headerlink" title="虚拟内存的管理"></a>虚拟内存的管理</h2><h3 id="换页与缺页异常"><a href="#换页与缺页异常" class="headerlink" title="换页与缺页异常"></a>换页与缺页异常</h3><p>如果虚拟页没有被分配使用，那么页表中自然没有对应的物理页映射。反过来，被分配使用的虚拟页在页表中一定有相应的物理页映射吗？答案是否定的。</p>
-<p>虚拟内存中存在换页机制。该机制的基本思想是：当物理内存容量不够的时候，操作系统把若干物理页写入磁盘中，然后回收物理页。当操作系统希望从应用程序 A 回收物理页 P （对应 A 的虚拟页 V）时，其会将物理页 P 的内容写入磁盘中一个位置，并且在应用程序 A 的页表中去除虚拟页 V 的映射，同时记录该物理页写入磁盘时的位置。这一过程叫做换出。此时，虚拟页 V 就处于已分配但未映射的状态。</p>
-<p>当程序访问到已分配但未映射的虚拟页时，就会触发缺页异常，此时会运行操作系统预先定义的缺页异常处理函数。该函数会找到一个空闲的物理页，将磁盘中的数据重新加载到该物理页中，并且在页表中填写虚拟地址到该物理页的映射。这一过程被称为换入。</p>
-<h3 id="换页策略"><a href="#换页策略" class="headerlink" title="换页策略"></a>换页策略</h3><p>常见的换页策略有：FIFO 策略、Second Chance 策略、LRU 策略、MRU 策略、时钟算法策略。</p>
-<h4 id="FIFO-策略"><a href="#FIFO-策略" class="headerlink" title="FIFO 策略"></a>FIFO 策略</h4><p>FIFO 策略优先选择最先换入的页进行换出。操作系统维护一个队列，每换入一个页就将其加入队尾，需要换出页时则从队列头选择页。这种算法在实际中表现不佳，也几乎不会被现代操作系统采用。</p>
-<h4 id="Second-Chance-策略"><a href="#Second-Chance-策略" class="headerlink" title="Second Chance 策略"></a>Second Chance 策略</h4><p>Second Chance 策略是 FIFO 策略的改进版。其在每个记录的物理页上增加了一个访问标志位，在寻找需要换出的内存页时，该策略优先查看位于队头的内存页。如果该内存页的访问标志位没有被置上，则换出该页；否则，将其标志位清空，并将其挪到队尾，然后继续从队头寻找符合条件的内存页。</p>
-<h4 id="LRU-策略"><a href="#LRU-策略" class="headerlink" title="LRU 策略"></a>LRU 策略</h4><p>LRU 策略会记录每个物理页被访问的时间，在寻找物理页进行换出时，优先选择那些最久未被访问的物理页。</p>
-<h4 id="MRU-策略"><a href="#MRU-策略" class="headerlink" title="MRU 策略"></a>MRU 策略</h4><p>MRU 策略和 LRU 策略相反，在寻找物理页进行换出时，会优先选择那些最近被访问的物理页。</p>
-<h4 id="时钟算法策略"><a href="#时钟算法策略" class="headerlink" title="时钟算法策略"></a>时钟算法策略</h4><p>时钟算法将换入物理内存的页号排成一个时钟的形状。该时钟有一个针臂，指向新换入内存的页号的后一个。同时，也为每个页号维护一个访问标志位。每次需要选择换出页号时，该算法从针臂所指的页号开始检查。如果当前页号的访问位没有设置，则将该页换出；否则，将其访问标志位清空，并将针臂顺时针移动到下一个页号。时钟算法策略类似 Second Chance 策略，但实现上更高效些。</p>
-<h1 id="物理内存"><a href="#物理内存" class="headerlink" title="物理内存"></a>物理内存</h1><h2 id="物理内存的分配"><a href="#物理内存的分配" class="headerlink" title="物理内存的分配"></a>物理内存的分配</h2><p>物理内存的分配有两个评价指标：内存资源利用率、分配性能。内存资源利用率要求分配机制可以减少内部碎片和外部碎片的大小；分配性能要求分配机制尽可能降低分配延迟和节约 CPU 资源。</p>
-<h3 id="伙伴系统"><a href="#伙伴系统" class="headerlink" title="伙伴系统"></a>伙伴系统</h3><p>伙伴系统是现代操作系统中广泛使用的机制。其基本思想是将物理内存划分成连续的块，以块为单位进行分配。不同块的大小可以不同，但每个块都有一个或多个连续的物理页组成，物理页的数量必须是 2 的 n 次幂（$0 \le n &lt;$ 预设的最大值）。当一个请求需要分配 m 个物理页时，伙伴系统将寻找一个大小合适的块，该块包括 $2^n$ 个物理页，且满足 $2^{n-1} &lt; m \le 2^{n}$。在处理分配请求的过程中，大的块可以分裂成两半，这两个块互为伙伴。分裂得到的块可以继续分裂，直到一个大小合适的块去服务相应的分配请求。在一个块被释放后，分配器会找到其伙伴块，若伙伴块也处于空闲的状态，则可以将这两个块进行合并，合并得到的块可以进一步向上合并。由于分裂操作和合并操作都是级联的，因此可以很好地解决外部碎片的问题。</p>
-<img src="/2021/03/11/OS-memory/虚拟内存翻译-空闲链表.png" width="45%">
-
-<p>在实际中，常用空闲列表去实现伙伴系统。具体来说，全局有一个有序数组，其每一项都指向一条空闲链表，每条链表将其对应大小的空闲块连接起来（一条链表中的空闲块大小相同）。当收到分配请求之后，伙伴分配器首先计算应该分配多大的空闲块，然后查找对应的空闲链表。例如，请求的大小是 15 KB，则应该分配一个 16 KB 的块。因此首先查找第二条 $2^2$ 空闲链表，如果链表不为空，则取出头节点的空闲块分配即可。但是在图中该链表为空，则继续访问第三条 $2^3$ 空闲链表，取出一个空闲块（32 KB），将其分裂成两个 16 KB 的空闲块，一块用于服务请求，另一个则插入 $2^2$ 这条空闲链表中。</p>
-<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a target="_blank" rel="noopener" href="https://item.jd.com/12731379.html">现代操作系统：原理与实现</a>第 4 章</p>
-
-          
+高效
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2021/03/11/OS-memory/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -1726,26 +1705,17 @@
       
         
           
-            <h2 id="CUDA-安装"><a href="#CUDA-安装" class="headerlink" title="CUDA 安装"></a>CUDA 安装</h2><p>CUDA 的安装比较简单，下载了安装包以后一直点 Next 就行了，可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/letutu/article/details/81237081">这个博客</a>。</p>
-<p>安装完以后对 CUDA 进行一下测试，在命令行执行 <code>nvcc -V</code> 得到下面的结果说明安装成功</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ nvcc -V</span><br><span class="line">nvcc: NVIDIA (R) Cuda compiler driver</span><br><span class="line">Copyright (c) 2005-2019 NVIDIA Corporation</span><br><span class="line">Built on Fri_Feb__8_19:08:26_Pacific_Standard_Time_2019</span><br><span class="line">Cuda compilation tools, release 10.1, V10.1.105</span><br></pre></td></tr></table></figure>
-
-<h2 id="Visual-Studio-配置"><a href="#Visual-Studio-配置" class="headerlink" title="Visual Studio 配置"></a>Visual Studio 配置</h2><p>网上很多博客中，在 Visual Studio 中新建项目时都会有一个 NVIDIA 的模板，但是我在新建时并没有看到。所以我直接新建空白项目，然后为项目添加 CUDA 的依赖项。</p>
-<img src="/2020/12/04/CUDA-PROGRAMMING-IN-WINDOWS/1.jpg" style="zoom:40%">
-<img src="/2020/12/04/CUDA-PROGRAMMING-IN-WINDOWS/2.png" style="zoom:60%">
-
-<p>然后在源文件中添加新建项，以 <code>.cu</code> 结尾，这里是 <code>test.cu</code>。然后对文件属性进行设置<br><img src="/2020/12/04/CUDA-PROGRAMMING-IN-WINDOWS/3.jpg" style="zoom:40%"></p>
-<p>设置内容为 <code>配置属性-常规-项类型-CUDA C/C++</code>。</p>
-<p>然后对项目属性进行配置。首先在 <code>配置属性-VC++ 目录-包含目录</code> 中添加 <code>$(CUDA_PATH)\include</code>，然后在 <code>配置属性-VC++ 目录-包含目录</code> 中添加 <code>$(CUDA_PATH)\lib\x64</code>，在 <code>配置属性-链接器-常规-附加库目录</code> 中添加 <code>$(CUDA_PATH)\lib\x64</code>，最后在 <code>配置属性-链接器-输入-附加依赖库</code> 中添加 </p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cublas.lib;cublasLt.lib;cuda.lib;cudadevrt.lib;cudart.lib;cudart_static.lib;cudnn.lib;cudnn64_8.lib;cudnn_adv_infer.lib;cudnn_adv_infer64_8.lib;cudnn_adv_train.lib;cudnn_adv_train64_8.lib;cudnn_cnn_infer.lib;cudnn_cnn_infer64_8.lib;cudnn_cnn_train.lib;cudnn_cnn_train64_8.lib;cudnn_ops_infer.lib;cudnn_ops_infer64_8.lib;cudnn_ops_train.lib;cudnn_ops_train64_8.lib;cufft.lib;cufftw.lib;curand.lib;cusolver.lib;cusparse.lib;nppc.lib;nppial.lib;nppicc.lib;nppicom.lib;nppidei.lib;nppif.lib;nppig.lib;nppim.lib;nppist.lib;nppisu.lib;nppitc.lib;npps.lib;nvblas.lib;nvgraph.lib;nvml.lib;nvrtc.lib;OpenCL.lib</span><br></pre></td></tr></table></figure>
-
-<p>实际上上面这些就是 <code>$(CUDA_PATH)\lib\x64</code> 下的所有 lib 文件的文件名，每个版本的 CUDA 所包括的 lib 文件各不相同，我这里是 CUDA 10.1 版本的 lib 文件。</p>
-<p>配置完以后就可以编译运行 <code>.cu</code> 文件了，打开 <code>main.cu</code>，输入以下测试代码</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&quot;cuda.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&quot;cuda_runtime.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="keyword">void</span> <span class="title">hello</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Hello world from device\n&quot;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    hello &lt;&lt; &lt;<span class="number">1</span>, <span class="number">1</span> &gt;&gt; &gt; ();</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Hello world from host\n&quot;</span>);</span><br><span class="line">    <span class="built_in">cudaDeviceSynchronize</span>();</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>得到结果</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Hello world from host</span><br><span class="line">Hello world from device</span><br></pre></td></tr></table></figure>
-          
+          CUDA 安装CUDA 的安装比较简单，下载了安装包以后一直点 Next 就行了，可以参考这个博客。
+安装完以后对 CUDA 进行一下测试，在命令行执行 nvcc -V 得到下面的结果说明安装成功
+12345$ nvcc -Vnvcc: NVIDIA (R) Cuda compiler driver
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2020/12/04/CUDA-PROGRAMMING-IN-WINDOWS/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -1916,15 +1886,16 @@
       
         
           
-            <p>下面是我对《<a target="_blank" rel="noopener" href="https://arxiv.org/abs/1711.09784">Distilling a Nerual Network Into a Soft Decision Tree</a>》的简单翻译</p>
-<h1 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h1><p>深度神经网络在分类任务上有很出色的表现，但是却非常难解释其对一个具体的测例做出分类的原因。这是因为他们非常依赖于分布式的分层表示。如果我们将从神经网络中获取到的知识用一个依赖于分层决定的模型来进行表示，解释一个具体的决定会变得更加容易。我们提出了一种使用训练好的神经网络来创建一种软决策树的方法，其比直接从训练数据中学到的模型泛化的更好。</p>
-<h1 id="Introdcution"><a href="#Introdcution" class="headerlink" title="Introdcution"></a>Introdcution</h1><p>深度神经网络优秀的泛化能力取决于它们隐藏层中的分布式表示，但是这种表示非常难被理解。对于第一个隐藏层，我们可以理解使一个神经元激活的原因；对最后一个隐藏层，我们可以理解激活一个神经元的效果；但是对于其他隐藏层，我们很难从有意义的变量的角度，如输入变量和输出变量，来理解特征激活的原因和影响。而且，隐藏层中的神经元将输入的向量分解为一组特征激活，通过这样的方式这些激活特征的组合效果可以在下一个隐藏层中产生一种合适的分布式表示。这使得很难单独地理解任何特定的特征激活的效果，因为其边际效应取决于同一隐藏层中的所有其他神经元的效果。</p>
-<p>深度神经网络可以通过模拟训练数据中输入和输出之间的大量弱统计规律来做出可靠的决定，并且神经网络中没有任何东西可以区分数据集中真实的弱规律性和训练集采样特性导致的虚假规律性，这进一步加剧了上述的困难。面对这些困难，放弃通过理解单个隐藏单元的行为来理解深度神经网络是如果做分类决策的想法看起来是明智。</p>
-<p>相比之下，决策树是如何进行任何特定的分类是很容易进行解释的，因为每个分类取决于一个相对较短的决策序列，并且每个决策都是直接基于输入数据的。但是，决策树通常并没有深度神经网络泛化的好。不同于神经网络中的隐藏神经元，决策树中一个特定的低层节点只被非常少的训练数据使用。因此，除非训练集的大小和树的深度相比呈指数增长，否则决策树的底层部分会趋于过拟合。</p>
-<p>在这篇文章中，我们提出了一种解决泛化性和可解释性之间矛盾的新方法。不同于尝试去理解一个深度神经网络是如何做出决策的，我们使用深度神经网络来训练一个决策树，其模仿神经网络发现的输入-输出函数，但以一种完全不同的方式工作。如果有非常多的无标记数据，则可以使用神经网络创建更大的标记数据集来训练决策树，从而克服决策树统计效率低下的问题。即使没有无标记数据，也可以使用最近先进的生成模型从一个接近于数据分布的分布中来生成合成的无标记数据。即使不适用无标记数据，也仍然可能使用一种叫分馏（distillation）的技术和一种做软决策的决策树来将神级网络中的泛化性转移到决策树中。</p>
-<p>在测试时，我们使用了决策树作为模型。这可能会比神经网络表现的差一些，但是决策树会更快，并且我们有了一个可以解释并直接参与决策的模型。我们从描述我们所使用的特定类型的决策树开始。这个选择是为了便于将深度神经网络获取的知识轻松地提取到决策树中。</p>
-
-          
+          下面是我对《Distilling a Nerual Network Into a Soft Decision Tree》的简单翻译
+Abstract深度神经网络在分类任务上有很出色的表现，但是却非常难解释其对一个具体的测例做出分类的原因。这是因为他们非常依赖于分布式的分层表示。如果我们将从神经网络中
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2020/11/19/Distilling-a-Nerual-Network-Into-a-Soft-Decision-Tree/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -2095,344 +2066,17 @@
       
         
           
-            <h1 id="HTML简介"><a href="#HTML简介" class="headerlink" title="HTML简介"></a>HTML简介</h1><p>HTML全程为Hyper Text Markup Language，翻译过来是超文本标记语言。所谓的超文本，包含了普通文本、图片、标题、表格、链接等。HTML是前端中最常使用的三个语言之一，一般由其组成网页的骨干。</p>
-<h1 id="HTML示例"><a href="#HTML示例" class="headerlink" title="HTML示例"></a>HTML示例</h1><p>下面有一段简单的HTML代码。</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;!doctype <span class="meta-keyword">html</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">html</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">head</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">meta</span> <span class="attr">charset</span>=<span class="string">&quot;UTF-8&quot;</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">title</span>&gt;</span>页面标题<span class="tag">&lt;/<span class="name">title</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">head</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">body</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">h1</span>&gt;</span>一级标题<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">p</span>&gt;</span>段落内容<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">body</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">html</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>将这一段代码保存为 .html 文件，并用浏览器打开，会得到以下的页面。<br><img src="/2019/07/01/HTML/example.png" alt="example"></p>
-<h1 id="HTML语法"><a href="#HTML语法" class="headerlink" title="HTML语法"></a>HTML语法</h1><p>简单来说，HTML语言是由一对对的标签组成的。在上面的例子中，我们有 <code>&lt;html&gt;</code> 和 <code>&lt;/html&gt;</code> 这一对标签，其中间的内容是 HTML 文件的主要内容；<code>&lt;h1&gt;</code> 和 <code>&lt;/h1&gt;</code> 两个标签表明他们中间的内容为一级标题，等等。当然，我们也发现了有像 <code>&lt;meta&gt;</code> 这样的单标签，没有响应的另一标签和其对应。</p>
-<p>下面，根据 HTML 标签中的不同种类对其进行介绍。</p>
-<h2 id="标题"><a href="#标题" class="headerlink" title="标题"></a>标题</h2><table>
-<thead>
-<tr>
-<th>标题等级</th>
-<th>标签</th>
-<th>效果</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>一级标题</td>
-<td><code>&lt;h1&gt;xxx&lt;\h1&gt;</code></td>
-<td><h1>一级标题</h1></td>
-</tr>
-<tr>
-<td>二级标题</td>
-<td><code>&lt;h2&gt;xxx&lt;\h2&gt;</code></td>
-<td><h2>二级标题</h2></td>
-</tr>
-<tr>
-<td>三级标题</td>
-<td><code>&lt;h3&gt;xxx&lt;\h3&gt;</code></td>
-<td><h3>三级标题</h3></td>
-</tr>
-<tr>
-<td>四级标题</td>
-<td><code>&lt;h4&gt;xxx&lt;\h4&gt;</code></td>
-<td><h4>四级标题</h4></td>
-</tr>
-<tr>
-<td>五级标题</td>
-<td><code>&lt;h5&gt;xxx&lt;\h5&gt;</code></td>
-<td><h5>五级标题</h5></td>
-</tr>
-<tr>
-<td>六级标题</td>
-<td><code>&lt;h6&gt;xxx&lt;\h6&gt;</code></td>
-<td><h6>六级标题</h6></td>
-</tr>
-</tbody></table>
-<h2 id="列表"><a href="#列表" class="headerlink" title="列表"></a>列表</h2><p>有序列表：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">ol</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">li</span>&gt;</span>阿凡达<span class="tag">&lt;/<span class="name">li</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">li</span>&gt;</span>泰坦尼克号<span class="tag">&lt;/<span class="name">li</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">li</span>&gt;</span>复仇者联盟<span class="tag">&lt;/<span class="name">li</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">ol</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：</p>
-<div style="line-height:12px">
-<ol>
-    <li>阿凡达</li>
-    <li>泰坦尼克号</li>
-    <li>复仇者联盟</li>
-</ol>
-</div>
-
-<p>无序列表</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">ul</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">li</span>&gt;</span>葡萄<span class="tag">&lt;/<span class="name">li</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">li</span>&gt;</span>西瓜<span class="tag">&lt;/<span class="name">li</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">li</span>&gt;</span>苹果<span class="tag">&lt;/<span class="name">li</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">ul</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：</p>
-<div style="line-height:12px">
-<ul>
-    <li>葡萄</li>
-    <li>西瓜</li>
-    <li>苹果</li>
-</ul>
-</div>
-
-<p>定义列表：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dl</span>&gt;</span></span><br><span class="line">   <span class="tag">&lt;<span class="name">dt</span>&gt;</span>计算机<span class="tag">&lt;/<span class="name">dt</span>&gt;</span></span><br><span class="line">   <span class="tag">&lt;<span class="name">dd</span>&gt;</span>用来计算的仪器 ... ...<span class="tag">&lt;/<span class="name">dd</span>&gt;</span></span><br><span class="line">   <span class="tag">&lt;<span class="name">dt</span>&gt;</span>显示器<span class="tag">&lt;/<span class="name">dt</span>&gt;</span></span><br><span class="line">   <span class="tag">&lt;<span class="name">dd</span>&gt;</span>以视觉方式显示信息的装置 ... ...<span class="tag">&lt;/<span class="name">dd</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dl</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：</p>
-<div style="line-height:13px">
-<dl>
-   <dt>计算机</dt>
-   <dd>用来计算的仪器 ... ...</dd>
-   <dt>显示器</dt>
-   <dd>以视觉方式显示信息的装置 ... ...</dd>
-</dl>
-</div>
-
-<h2 id="链接"><a href="#链接" class="headerlink" title="链接"></a>链接</h2><p>链接用于外链到其他网站，使用方法如下：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;http://www.tsinghua.edu.cn&quot;</span>&gt;</span></span><br><span class="line">清华大学</span><br><span class="line"><span class="tag">&lt;/<span class="name">a</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：<br><a target="_blank" rel="noopener" href="http://www.tsinghua.edu.cn"><br>清华大学<br></a></p>
-<h2 id="多媒体"><a href="#多媒体" class="headerlink" title="多媒体"></a>多媒体</h2><p>多媒体包括图片、音频、视频等等多媒体文件。</p>
-<p>图片：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">img</span> </span></span><br><span class="line"><span class="tag"> <span class="attr">src</span>=<span class="string">&quot;https://p0.ssl.qhimg.com/t0142620c6328f7ab7d.jpg&quot;</span></span></span><br><span class="line"><span class="tag"> <span class="attr">alt</span>=<span class="string">&quot;Metal movable type&quot;</span></span></span><br><span class="line"><span class="tag"> <span class="attr">width</span>=<span class="string">&quot;400&quot;</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果：<br><img src="https://p0.ssl.qhimg.com/t0142620c6328f7ab7d.jpg" alt="Metal movable type" width="400"></p>
-<p>音频：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">audio</span></span></span><br><span class="line"><span class="tag"><span class="attr">controls</span></span></span><br><span class="line"><span class="tag"><span class="attr">src</span>=<span class="string">&quot;https://s2.ssl.qhres.com/static/cbf0c6b1ea11e72b.ogg&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">audio</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果：<br><audio controls src="https://s2.ssl.qhres.com/static/cbf0c6b1ea11e72b.ogg"><br></audio></p>
-<p>视频：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">video</span></span></span><br><span class="line"><span class="tag">  <span class="attr">src</span>=<span class="string">&quot;https://s2.ssl.qhres.com/static/eb04e248864ac1a8.mp4&quot;</span></span></span><br><span class="line"><span class="tag">  <span class="attr">controls</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">video</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果：<br><video src="https://s2.ssl.qhres.com/static/eb04e248864ac1a8.mp4" controls><br></video></p>
-<h2 id="输入"><a href="#输入" class="headerlink" title="输入"></a>输入</h2><p>HTML中输入使用的是<code>&lt;input&gt;</code>标签，但是赋予不同的属性之后会得到不一样的效果。</p>
-<p>最简单的输入标签如下：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果为：<br>    <input></p>
-<p>如果我们要在输入框中添加一些提示，则可以这样做：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">placeholder</span>=<span class="string">&quot;请输入用户名&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：<br><input placeholder="请输入用户名"></p>
-<p>如果我们要让用户输入一个范围，那我们可以指定标签的类型。</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;range&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：<br><input type="range"></p>
-<p>如果我们要用户输入一个数字，并且这个数字有一定的范围，那我们可以指定这个标签的更多属性</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;number&quot;</span> <span class="attr">min</span>=<span class="string">&quot;1&quot;</span> <span class="attr">max</span>=<span class="string">&quot;10&quot;</span> <span class="attr">value</span>=<span class="string">&quot;3&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：<br><input type="number" min="1" max="10" value="3"></p>
-<p>如果我们要用户输入一个日期，并且也有一定的范围，同上面一样，我们可以这样做：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;date&quot;</span> <span class="attr">min</span>=<span class="string">&quot;2018-02-10&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：<br><input type="date" min="2018-02-10"></p>
-<p>如果我们用用户输入一系列文本，则应该使用<code>&lt;textarea&gt;</code>标签</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">textarea</span>&gt;</span>Hello<span class="tag">&lt;/<span class="name">textarea</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果如下：<br><textarea>Hello</textarea></p>
-<h2 id="选择"><a href="#选择" class="headerlink" title="选择"></a>选择</h2><p>选择使用的是<code>checkbox</code>和<code>radio</code>两种属性。各自的效果如下：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;checkbox&quot;</span>&gt;</span> Apple</span><br><span class="line"><span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;checkbox&quot;</span> <span class="attr">checked</span>&gt;</span> Watermelon</span><br></pre></td></tr></table></figure>
-<p>效果为：<br><input type="checkbox"> Apple<br><input type="checkbox" checked> Watermelon</p>
-<p>另一种选择则是：</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;radio&quot;</span> <span class="attr">name</span>=<span class="string">&quot;sport&quot;</span>&gt;</span> basketball</span><br><span class="line"><span class="tag">&lt;<span class="name">input</span> <span class="attr">type</span>=<span class="string">&quot;radio&quot;</span> <span class="attr">name</span>=<span class="string">&quot;sport&quot;</span>&gt;</span> football</span><br></pre></td></tr></table></figure>
-<p>效果为：<br><input type="radio" name="sport"> basketball<br><input type="radio" name="sport"> football</p>
-<h2 id="文本标签"><a href="#文本标签" class="headerlink" title="文本标签"></a>文本标签</h2><figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">blockquote</span> <span class="attr">cite</span>=<span class="string">&quot;http://t.cn/RfjKO0F&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span>天才并不是⾃⽣⾃⻓在深林荒野⾥的怪物， 是由可以使天才⽣⻓</span><br><span class="line">的⺠众产⽣、⻓育出来的，所以没有 这种⺠众，就没有天才。<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">blockquote</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span>我最喜欢的⼀本书是<span class="tag">&lt;<span class="name">cite</span>&gt;</span>⼩王⼦<span class="tag">&lt;/<span class="name">cite</span>&gt;</span>。<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span>在<span class="tag">&lt;<span class="name">cite</span>&gt;</span>第⼀章<span class="tag">&lt;/<span class="name">cite</span>&gt;</span>，我们讲过<span class="tag">&lt;<span class="name">q</span>&gt;</span>字符串是不可变量<span class="tag">&lt;/<span class="name">q</span>&gt;</span>。<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span><span class="tag">&lt;<span class="name">code</span>&gt;</span>const<span class="tag">&lt;/<span class="name">code</span>&gt;</span>声明创建⼀个只读的常量。<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">pre</span>&gt;</span><span class="tag">&lt;<span class="name">code</span>&gt;</span></span><br><span class="line">const add = (a, b) =&gt; a + b;</span><br><span class="line">const multiply = (a, b) =&gt; a * b;</span><br><span class="line"><span class="tag">&lt;/<span class="name">code</span>&gt;</span><span class="tag">&lt;/<span class="name">pre</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">p</span>&gt;</span>在投资之前，<span class="tag">&lt;<span class="name">strong</span>&gt;</span>⼀定要做⻛险评估<span class="tag">&lt;/<span class="name">strong</span>&gt;</span>。<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>效果为：</p>
-<div>
-<blockquote cite="http://t.cn/RfjKO0F">
-<p>天才并不是⾃⽣⾃⻓在深林荒野⾥的怪物， 是由可以使天才⽣⻓
-的⺠众产⽣、⻓育出来的，所以没有 这种⺠众，就没有天才。</p>
-</blockquote>
-<p>我最喜欢的⼀本书是<cite>⼩王⼦</cite>。</p>
-<p>在<cite>第⼀章</cite>，我们讲过<q>字符串是不可变量</q>。</p>
-<p><code>const</code>声明创建⼀个只读的常量。</p>
-<pre><code>const add = (a, b) => a + b;
-const multiply = (a, b) => a * b;
-</code></pre>
-<p>在投资之前，<strong>⼀定要做⻛险评估</strong>。</p>
-</div>
-
-
-<p><code>&lt;p&gt;</code>标签生成一个新的段落，<code>&lt;cite&gt;</code>用于标记斜体文字，<code>&lt;code&gt;</code>可以标注出文本中的代码，<code>&lt;strong&gt;</code>用以将指定文字粗体，<code>&lt;pre&gt;</code>用以生成一个文本框。</p>
-<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>以上就是比较常用的HTML标签，当然，制作一个网页只有HTML是不够的，往往还需要配合CSS和JavaScript才能制作出动态美观的网页。</p>
-
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2019/06/14/LPS/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/me.jpg">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="马克刘的学习记录">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2019/06/14/LPS/" itemprop="url">最长回文子序列问题</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">发表于</span>
-              
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-06-14T18:20:31+08:00">
-                2019-06-14
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-            <span class="post-category" >
-            
-              <span class="post-meta-divider">|</span>
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">分类于</span>
-              
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index">
-                    <span itemprop="name">算法</span>
-                  </a>
-                </span>
-
-                
-                
-                  ， 
-                
-              
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/%E5%8A%A8%E6%80%81%E8%A7%84%E5%88%92/" itemprop="url" rel="index">
-                    <span itemprop="name">动态规划</span>
-                  </a>
-                </span>
-
-                
-                
-              
-            </span>
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-            <div class="post-wordcount">
-              
-                
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-file-word-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">字数统计&#58;</span>
-                
-                <span title="字数统计">
-                  911
-                </span>
-              
-
-              
-                <span class="post-meta-divider">|</span>
-              
-
-              
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-clock-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">阅读时长 &asymp;</span>
-                
-                <span title="阅读时长">
-                  4
-                </span>
-              
-            </div>
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body han-init-context" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h3 id="问题描述"><a href="#问题描述" class="headerlink" title="问题描述"></a>问题描述</h3><p><strong>回文</strong>是正序与逆序相同的非空字符串。例如，所有长度为1的字符串、civic、racecar、aibohphobia（害怕回文之意）都是回文。</p>
-<p>设计高效算法，求给定输入字符串的最长回文子序列。例如，给定输入 character，算法应该返回 carac。算法的运行时间是怎么样的？</p>
-<h3 id="题解"><a href="#题解" class="headerlink" title="题解"></a>题解</h3><p>本题出自《算法导论》第 15 章的思考题15-3。这道题可以使用暴力罗列的方法做，那么总共会有 $2^n$ 种情况，算法的复杂度也为 $O(2^n)$ ，其中 $n$ 为输入字符串的长度。</p>
-<p>为了减小算法的复杂度，可以使用动态规划的方法解决。</p>
-<p>给定任意一个输入串 $X = {x_1, x_2, x_3, x_4… x_n}$，定义其子串 $X_{i,j} = { x_i, x_{i+1}, x_{i+2}, …, x_j}$。设一个函数 $f(X_{i,j})$，其定义如下：</p>
-<p>$$f(X_{i,j})= 1 , X_{i,j}是回文序列 $$<br>$$f(X_{i,j})= 0 , X_{i,j}不是回文序列$$</p>
-<p>对于任意一个子串 $X_{i,j}$，分以下几种情况讨论：</p>
-<p>$ x_i = x_j $，则此时 $X_{i,j}$是否是回文子序列，与 $x_i$和 $x_j$无关，可以将其从 $ X_{ij} $中去除。如果 $X_{i+1, j-1} $是一个回文序列，则 $X_{i, j}$ 也是一个回文序列；如果 $X_{i+1, j-1} $不是一个回文序列，则 $X_{i, j}$也不是一个回文序列。例如，给定一个序列 $ 1w1 $，其中 $w$是一段字符串序列。由于这个序列左右两端是相同的，因此当 $w$是一个回文序列时， $1w1$才是一个回文序列；反之亦然。所以，我们可以给出如下式子：<br>$$ f(X_{i,j}) = f(X_{i+1, j - 1}), x_i = x_j$$</p>
-<p>$ x_i \neq x_j$，则此时由于 $X_{i, j}$两端的字符不同，其当然不是回文序列。同上，我们有：<br>$$ f(X_{i,j}) = 0, x_i \neq x_j$$</p>
-<p>除此之外，我们还知道，一个只含有单个字符的字符串是回文序列；一个只有两个字符的字符串，即 $X_{i, i+1}$，如果有 $x_i = x_{i+1} $，则其也是回文序列。</p>
-<p>综上，我们给出 $f(X_{i, j})$的完整递归式：<br>$ f(X_{i, j}) =  1 , i = j  $<br>$f(X_{i, j}) = 1 , x_i = x_j, j = i + 1 $<br>$  f(X_{i, j}) =f(X_{i+1, j-1}) ,x_i = x_j $<br>$f(X_{i, j}) = 0 , x_i \neq x_j  $</p>
-<p>我们不妨使用一个 $ n \times n $的矩阵来储存 $f(X_{i, j})$的值。我们给出如下伪代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"> LONGEST-PALINDROME-SUBSEQUENCE(S)</span><br><span class="line">1   n = S.length</span><br><span class="line">2   let p[1 ... n, 1 ... n] be a new table</span><br><span class="line">3   for i = 1 to n</span><br><span class="line">4       for j = 1 to n</span><br><span class="line">5           if i == j</span><br><span class="line">6               p[i][j] = 1</span><br><span class="line">7           else</span><br><span class="line">8               p[i][j] = 0</span><br><span class="line">9   for i = 1 to n-1</span><br><span class="line">10      for j = 1 to n-i</span><br><span class="line">11          if i == 1</span><br><span class="line">12              if S[j] == S[j+1]</span><br><span class="line">13                  p[j][j+1] = 1</span><br><span class="line">14          else if x[j] == x[j + i]</span><br><span class="line">15              p[j][j+i] = p[j+1][j+i-1]</span><br><span class="line">16          else</span><br><span class="line">17              p[j][j+i] = 0</span><br><span class="line">18</span><br><span class="line">19  max_length = -1, left = 0, right = 0</span><br><span class="line">20  for i = 1 to n</span><br><span class="line">21      for j = 1 to n</span><br><span class="line">22          if j - i &gt; max_length</span><br><span class="line">23              max_length = j - i</span><br><span class="line">24              left = i, right = j</span><br><span class="line">25  return S[left:right]</span><br></pre></td></tr></table></figure>
-
-<p>使用Python的实现如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np </span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">LPS</span>(<span class="params">s</span>):</span></span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(s) &lt;= <span class="number">1</span>:</span><br><span class="line">        <span class="keyword">return</span> s</span><br><span class="line">    p = np.zeros((<span class="built_in">len</span>(s), <span class="built_in">len</span>(s)))</span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(s)):</span><br><span class="line">        p[i][i] = <span class="number">1</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1</span>, <span class="built_in">len</span>(s)):</span><br><span class="line">        <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(s) - i):</span><br><span class="line">            <span class="keyword">if</span> i == <span class="number">1</span>:</span><br><span class="line">                <span class="keyword">if</span> s[j] == s[j+i]:</span><br><span class="line">                    p[j][j+i] = <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">if</span> s[j] == s[j+i]:</span><br><span class="line">                    p[j][j+i] = p[j+<span class="number">1</span>][j+i-<span class="number">1</span>]</span><br><span class="line">                <span class="keyword">else</span>:</span><br><span class="line">                    p[j][j+i] = <span class="number">0</span></span><br><span class="line">    max_len = -<span class="number">1</span></span><br><span class="line">    l, r = -<span class="number">1</span>, -<span class="number">1</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(s)-<span class="number">1</span>):</span><br><span class="line">        <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(i, <span class="built_in">len</span>(s)):</span><br><span class="line">            <span class="keyword">if</span> p[i][j] == <span class="number">1</span> <span class="keyword">and</span> j - i &gt; max_len:</span><br><span class="line">                l, r = i, j</span><br><span class="line">                max_len = j - i</span><br><span class="line">    <span class="keyword">return</span> s[l:r+<span class="number">1</span>]</span><br></pre></td></tr></table></figure>
-<p>显然，该算法的复杂度为 $ O(n^2) $，远比暴力求解的 $O(2^n)$要好。</p>
-
-          
+          HTML简介HTML全程为Hyper Text Markup Language，翻译过来是超文本标记语言。所谓的超文本，包含了普通文本、图片、标题、表格、链接等。HTML是前端中最常使用的三个语言之一，一般由其组成网页的骨干。
+HTML示例下面有一段简单的HTML代码。
+1234567891011&
+          ...
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2019/07/01/HTML/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
@@ -2518,9 +2162,9 @@ const multiply = (a, b) => a * b;
             
               <div class="site-state-item site-state-posts">
               
-                <a href="/archives/%7C%7C%20archive">
+                <a href="/archives/%7C%7Carchive">
               
-                  <span class="site-state-item-count">11</span>
+                  <span class="site-state-item-count">12</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -2531,7 +2175,7 @@ const multiply = (a, b) => a * b;
               
               <div class="site-state-item site-state-categories">
                 <a href="/categories/index.html">
-                  <span class="site-state-item-count">13</span>
+                  <span class="site-state-item-count">15</span>
                   <span class="site-state-item-name">分类</span>
                 </a>
               </div>
@@ -2594,7 +2238,7 @@ const multiply = (a, b) => a * b;
     
       <span class="post-meta-item-text">Site words total count&#58;</span>
     
-    <span title="Site words total count">23.6k</span>
+    <span title="Site words total count">25.4k</span>
   
 </div>
 
