@@ -75,7 +75,6 @@ $(document).ready(function () {
     var targetSelector = NexT.utils.escapeSelector(this.getAttribute('href'));
     targetSelector = decodeURI(this.getAttribute('href'))
     var offset = $(targetSelector).offset().top;
-
     hasVelocity ?
       html.velocity('stop').velocity('scroll', {
         offset: offset  + 'px',
