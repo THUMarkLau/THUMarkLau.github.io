@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+  
+  
+  <link rel="stylesheet" media="all" href="/lib/Han/dist/han.min.css?v=3.3">
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT" />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在前面两篇文章中，我们介绍了 LevelDB 的写流程和读流程。原本准备这篇文章介绍 LevelDB 的 MemTable 结构，但是在 LevelDB Handbook 的内容编排中，MemTable 被放在了预写日志之后介绍。于是我也决定按照 Handbook 的顺序，先介绍预写日志，再介绍 MemTable 的结构。 WAL：预写日志WAL 的英文全称为 Write-Ahead Log ，翻">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB 源代码阅读（三）：预写日志">
+<meta property="og:url" content="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/index.html">
+<meta property="og:site_name" content="马克刘的学习记录">
+<meta property="og:description" content="在前面两篇文章中，我们介绍了 LevelDB 的写流程和读流程。原本准备这篇文章介绍 LevelDB 的 MemTable 结构，但是在 LevelDB Handbook 的内容编排中，MemTable 被放在了预写日志之后介绍。于是我也决定按照 Handbook 的顺序，先介绍预写日志，再介绍 MemTable 的结构。 WAL：预写日志WAL 的英文全称为 Write-Ahead Log ，翻">
+<meta property="og:locale">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/LSM.png">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/Leveldb-WAL.png">
+<meta property="article:published_time" content="2021-07-11T08:10:06.000Z">
+<meta property="article:modified_time" content="2021-07-12T12:56:56.989Z">
+<meta property="article:author" content="Mark Lau">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/LSM.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"always","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/"/>
+
+
+
+
+
+  <title>LevelDB 源代码阅读（三）：预写日志 | 马克刘的学习记录</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">马克刘的学习记录</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/me.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="马克刘的学习记录">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">LevelDB 源代码阅读（三）：预写日志</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-07-11T16:10:06+08:00">
+                2021-07-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index">
+                    <span itemprop="name">数据库</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/" itemprop="url" rel="index">
+                    <span itemprop="name">源代码阅读</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/LevelDB/" itemprop="url" rel="index">
+                    <span itemprop="name">LevelDB</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+            <div class="post-wordcount">
+              
+                
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-file-word-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">字数统计&#58;</span>
+                
+                <span title="字数统计">
+                  4108 字
+                </span>
+              
+
+              
+                <span class="post-meta-divider">|</span>
+              
+
+              
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-clock-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">阅读时长 &asymp;</span>
+                
+                <span title="阅读时长">
+                  18 分钟
+                </span>
+              
+            </div>
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body han-init-context" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在前面两篇文章中，我们介绍了 LevelDB 的写流程和读流程。原本准备这篇文章介绍 LevelDB 的 MemTable 结构，但是在 <a target="_blank" rel="noopener" href="https://leveldb-handbook.readthedocs.io/zh/latest/index.html">LevelDB Handbook</a> 的内容编排中，MemTable 被放在了预写日志之后介绍。于是我也决定按照 Handbook 的顺序，先介绍预写日志，再介绍 MemTable 的结构。</p>
+<h1 id="WAL：预写日志"><a href="#WAL：预写日志" class="headerlink" title="WAL：预写日志"></a>WAL：预写日志</h1><p>WAL 的英文全称为 Write-Ahead Log ，翻译过来就是预写日志。所谓预写，就是在正式地执行对数据的写操作前（插入或者删除），先将操作的内容通过日志记录下来，这么做的目的是为了防止因进程异常或者服务器异常导致的数据库异常。</p>
+<img src="/2021/07/11/leveldb-source-code-reading-3/LSM.png" width="65%">
+
+<p>我们考虑下面两种情况：</p>
+<ul>
+<li>日志未写完或者未开始写进程就异常退出</li>
+<li>日志写完了，数据没写完或者没开始写进程异常退出</li>
+<li>日志写完了，数据也写完了，进程异常退出</li>
+</ul>
+<p>第一种情况下，在数据库恢复时会看到一条不完整的日志（写到一半）或者看不到该条日志（没开始写），这种情况下可以认为这次写操作失败，数据库也不会恢复这次操作，保证了写操作的原子性。</p>
+<p>第二种情况下，数据库在恢复时可以通过读取到的日志内容来恢复未完成的写操作，同样保证了原子性。</p>
+<p>第三种情况就是正常的情况，数据库在恢复时无须进行任何操作。</p>
+<p>因此，WAL 在这三种情况下都可以保证数据库写操作的原子性。对于 WAL 的更多知识，可以查看这篇<a target="_blank" rel="noopener" href="https://martinfowler.com/articles/patterns-of-distributed-systems/wal.html">文章</a>。下面我们看看 WAL 在 LevelDB 中是如何实现的。</p>
+<h1 id="LevelDB-中的-WAL-实现"><a href="#LevelDB-中的-WAL-实现" class="headerlink" title="LevelDB 中的 WAL 实现"></a>LevelDB 中的 WAL 实现</h1><h2 id="LevelDB-的日志结构"><a href="#LevelDB-的日志结构" class="headerlink" title="LevelDB 的日志结构"></a>LevelDB 的日志结构</h2><img src="/2021/07/11/leveldb-source-code-reading-3/Leveldb-WAL.png" width="80%">
+
+<p>上图是 LevelDB 中日志的结构。日志被存储的最小单位是 Chunk，一个 Chunk 包含了四个部分：校验和 Checksum（4 个字节）、数据长度 Length （2 个字节），Chunk 类型 Type（1 个字节）以及数据内容，前三个部分被称为 ChunkHeader 。校验和是由数据类型以及数据内容计算出来的，使用的算法是 CRC 校验算法。Chunk 类型一共有 4 种：Full、First、Midlle、Last 。之所以需要有四种 Chunk 类型，是因为一条日志有可能因为大小太大而被存在多个 Chunk 当中。假如一条日志被存放在了一个 Chunk 当中，那么这个 Chunk 的类型就是 Full ；假如一条日志被存放在了多个 Chunk 当中，那么第一个 Chunk 的类型为 First ，最后一个 Chunk 的类型为 Last ，First 和 Last 之间包含了零个或多个 Middle 类型的 Chunk ，这些所有的 Chunk 中的数据组合起来就是日志的原始数据。</p>
+<p>一个或多个 Chunk 会组成一个 Block 。一个 Block 是有大小限制的，上限是 32 KB，即 32768 个字节。当一个 Block 的大小达到了阈值后，这个 Block 就会被关闭，然后开启一个新的 Block 。如果我们往一个 Block 中写日志时，Block 中剩余的空间足够写下一个 ChunkHeader， 但无法容下这条日志的所有内容，那么就会写入一个类型为 First 的 Chunk，然后开启一个新的 Block ，将剩余的数据写在新 Block 中。我们可以推理出，假如一个 Chunk 的类型为 Middle，那么这个 Chunk 一定占据了一整个 Block （想想这是为什么）。</p>
+<h2 id="写日志"><a href="#写日志" class="headerlink" title="写日志"></a>写日志</h2><p>LevelDB 中所有的写操作都会在 <code>DBImpl::Write</code> 函数中被处理，这当中也包含了对 WAL 的处理，代码如下</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// db_impl.cc</span></span><br><span class="line"><span class="function">Status <span class="title">DBImpl::Write</span><span class="params">(<span class="keyword">const</span> WriteOptions&amp; options, WriteBatch* updates)</span> </span>&#123;</span><br><span class="line">  ... <span class="comment">// some code prepare for writing</span></span><br><span class="line">  <span class="comment">// Write WAL</span></span><br><span class="line">  status = log_-&gt;<span class="built_in">AddRecord</span>(WriteBatchInternal::<span class="built_in">Contents</span>(write_batch));</span><br><span class="line">  <span class="keyword">bool</span> sync_error = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">if</span> (status.<span class="built_in">ok</span>() &amp;&amp; options.sync) &#123;</span><br><span class="line">    status = logfile_-&gt;<span class="built_in">Sync</span>();</span><br><span class="line">    <span class="keyword">if</span> (!status.<span class="built_in">ok</span>()) &#123;</span><br><span class="line">      sync_error = <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (status.<span class="built_in">ok</span>()) &#123;</span><br><span class="line">    <span class="comment">// insert the data to the memtable</span></span><br><span class="line">    status = WriteBatchInternal::<span class="built_in">InsertInto</span>(write_batch, mem_);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  ... <span class="comment">// some code after write</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> status;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，WAL 确实是在正式写数据之前完成的。 <code>WriteBatchInternal::Contents</code> 函数会将 WriteBatch 中的 rep_ 包装成 <em>Slice</em> 对象（关于 WriteBatch 和 Slice 的介绍，可以参考前面介绍 LevelDB 写流程的文章），然后传入 Writer 的 <code>AddRecord</code> 函数中。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// log_writer.cc</span></span><br><span class="line"><span class="function">Status <span class="title">Writer::AddRecord</span><span class="params">(<span class="keyword">const</span> Slice&amp; slice)</span> </span>&#123;</span><br><span class="line">	<span class="comment">// the data and length of the log</span></span><br><span class="line">  <span class="keyword">const</span> <span class="keyword">char</span>* ptr = slice.<span class="built_in">data</span>();</span><br><span class="line">  <span class="keyword">size_t</span> left = slice.<span class="built_in">size</span>();</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Fragment the record if necessary and emit it.  Note that if slice</span></span><br><span class="line">  <span class="comment">// is empty, we still want to iterate once to emit a single</span></span><br><span class="line">  <span class="comment">// zero-length record</span></span><br><span class="line">  Status s;</span><br><span class="line">  <span class="keyword">bool</span> begin = <span class="literal">true</span>;</span><br><span class="line">  <span class="keyword">do</span> &#123;</span><br><span class="line">    <span class="comment">// ------------ Begin of Code Fragment A -------------</span></span><br><span class="line">  	<span class="comment">// the left size of current block</span></span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">int</span> leftover = kBlockSize - block_offset_;</span><br><span class="line">    <span class="built_in">assert</span>(leftover &gt;= <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (leftover &lt; kHeaderSize) &#123;</span><br><span class="line">			<span class="comment">// If the left space cannot write a chunk header</span></span><br><span class="line">      <span class="comment">// Switch to a new block</span></span><br><span class="line">      <span class="keyword">if</span> (leftover &gt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// Fill the trailer (literal below relies on kHeaderSize being 7)</span></span><br><span class="line">        <span class="built_in"><span class="keyword">static_assert</span></span>(kHeaderSize == <span class="number">7</span>, <span class="string">&quot;&quot;</span>);</span><br><span class="line">        dest_-&gt;<span class="built_in">Append</span>(<span class="built_in">Slice</span>(<span class="string">&quot;\x00\x00\x00\x00\x00\x00&quot;</span>, leftover));</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">// when switching to a new block, just set the offset in the block to 0</span></span><br><span class="line">      block_offset_ = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ------------ End of Code Fragment A -------------</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------ Begin of Code Fragment B -------------</span></span><br><span class="line">    <span class="comment">// Invariant: we never leave &lt; kHeaderSize bytes in a block.</span></span><br><span class="line">    <span class="built_in">assert</span>(kBlockSize - block_offset_ - kHeaderSize &gt;= <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// the size of space used for writing data</span></span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">size_t</span> avail = kBlockSize - block_offset_ - kHeaderSize;</span><br><span class="line">    <span class="comment">// if the fragment_length == left, current log can be completely written into this block</span></span><br><span class="line">    <span class="comment">// else current log should be divided into several fragment</span></span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">size_t</span> fragment_length = (left &lt; avail) ? left : avail;</span><br><span class="line"></span><br><span class="line">    RecordType type;</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">bool</span> end = (left == fragment_length);</span><br><span class="line">    <span class="keyword">if</span> (begin &amp;&amp; end) &#123;</span><br><span class="line">      type = kFullType;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (begin) &#123;</span><br><span class="line">      type = kFirstType;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (end) &#123;</span><br><span class="line">      type = kLastType;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      type = kMiddleType;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ------------ End of Code Fragment B -------------</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------ Begin of Code Fragment C -------------</span></span><br><span class="line">    <span class="comment">// write current chunk to disk</span></span><br><span class="line">    s = <span class="built_in">EmitPhysicalRecord</span>(type, ptr, fragment_length);</span><br><span class="line">    ptr += fragment_length;</span><br><span class="line">    left -= fragment_length;</span><br><span class="line">    begin = <span class="literal">false</span>;</span><br><span class="line">    <span class="comment">// ------------ End of Code Fragment C -------------</span></span><br><span class="line">  &#125; <span class="keyword">while</span> (s.<span class="built_in">ok</span>() &amp;&amp; left &gt; <span class="number">0</span>);</span><br><span class="line">  <span class="keyword">return</span> s;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码还是比较清晰的，A 段代码主要是在检查当前 Block 剩余空间大小：如果当前 Block 剩余的空间小于一个 ChunkHeader 的大小，那么就会把 Block 剩下的空间用 0 填满，然后切换到一个新的 Block 中。这里切换新 Block 的操作非常简单，就是将记录当前数据 offset 的变量置为 0 。 B 段代码则是在检查当前这条日志的写入情况：如果 Block 剩余的空间大小可以将这条日志写完，那么新加入的 Chunk 类型就为 Full ；否则一条日志可能要写在多个 Chunk 中，那么就根据当前写的情况将 Chunk 标志为 First、Middle 或者 Last 。C 段代码则是调用函数将当前这条 Chunk 提交并写入到磁盘中。值得注意的是，假如我们当前日志的内容为空，即变量 left 一开始就为 0，那么这段代码仍然会提交一个 data 段为空的 Chunk 。</p>
+<p>下面我们来看看一个 Chunk 是如何被提交的。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// log_writer.cc</span></span><br><span class="line"><span class="function">Status <span class="title">Writer::EmitPhysicalRecord</span><span class="params">(RecordType t, <span class="keyword">const</span> <span class="keyword">char</span>* ptr,</span></span></span><br><span class="line"><span class="params"><span class="function">                                  <span class="keyword">size_t</span> length)</span> </span>&#123;</span><br><span class="line">  <span class="built_in">assert</span>(length &lt;= <span class="number">0xffff</span>);  <span class="comment">// Must fit in two bytes</span></span><br><span class="line">  <span class="built_in">assert</span>(block_offset_ + kHeaderSize + length &lt;= kBlockSize);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Format the header</span></span><br><span class="line">  <span class="comment">// The structure of Header</span></span><br><span class="line">  <span class="comment">// CheckSum     4 Byte</span></span><br><span class="line">  <span class="comment">// DataLength   2 Byte</span></span><br><span class="line">  <span class="comment">// ChunkType    1 Byte</span></span><br><span class="line">  <span class="keyword">char</span> buf[kHeaderSize];</span><br><span class="line">	<span class="comment">// ------------ Start of Code Fragment A -------------</span></span><br><span class="line">  <span class="comment">// Encode the DataLength</span></span><br><span class="line">  buf[<span class="number">4</span>] = <span class="keyword">static_cast</span>&lt;<span class="keyword">char</span>&gt;(length &amp; <span class="number">0xff</span>);</span><br><span class="line">  buf[<span class="number">5</span>] = <span class="keyword">static_cast</span>&lt;<span class="keyword">char</span>&gt;(length &gt;&gt; <span class="number">8</span>);</span><br><span class="line">  <span class="comment">// Encode the ChunkType</span></span><br><span class="line">  buf[<span class="number">6</span>] = <span class="keyword">static_cast</span>&lt;<span class="keyword">char</span>&gt;(t);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Compute the crc of the record type and the payload.</span></span><br><span class="line">  <span class="keyword">uint32_t</span> crc = crc32c::<span class="built_in">Extend</span>(type_crc_[t], ptr, length);</span><br><span class="line">  crc = crc32c::<span class="built_in">Mask</span>(crc);  <span class="comment">// Adjust for storage</span></span><br><span class="line">  <span class="built_in">EncodeFixed32</span>(buf, crc);</span><br><span class="line">	<span class="comment">// ------------ End of Code Fragment A -------------</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// ------------ Start of Code Fragment B -------------</span></span><br><span class="line">  <span class="comment">// Write the header and the payload</span></span><br><span class="line">  Status s = dest_-&gt;<span class="built_in">Append</span>(<span class="built_in">Slice</span>(buf, kHeaderSize));</span><br><span class="line">  <span class="keyword">if</span> (s.<span class="built_in">ok</span>()) &#123;</span><br><span class="line">    s = dest_-&gt;<span class="built_in">Append</span>(<span class="built_in">Slice</span>(ptr, length));</span><br><span class="line">    <span class="keyword">if</span> (s.<span class="built_in">ok</span>()) &#123;</span><br><span class="line">    	<span class="comment">// flush the chunk to disk</span></span><br><span class="line">      s = dest_-&gt;<span class="built_in">Flush</span>();</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">	<span class="comment">// ------------ End of Code Fragment B -------------</span></span><br><span class="line">  block_offset_ += kHeaderSize + length;</span><br><span class="line">  <span class="keyword">return</span> s;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这一段代码分为两个部分：A 部分代码编码了 ChunkHeader ，我们可以看到校验和是通过 <code>crc32c::Extend</code> 和 <code>crc32c::Mask</code> 方法计算得到的，然后它们和 DataLength、 ChunkType 一起被编码进了 buf 中。B 部分将 ChunkHeader 和 Data 分别添加到了 dest_ 中。这里的 dest_ 是一个 <em>WritableFile</em> 对象，其 <code>Append</code> 的方法并不会将数据刷到文件中，而是保存在一个缓冲区中。当 Chunk Header 以及 Data 部分的数据都成功添加到了 dest_ 中后，就会调用其 <code>Flush</code> 方法，这个方法会将其缓冲区中的 Chunk 刷到磁盘上。有一点需要注意的是，在不同的操作系统下，dest_ 的具体类型会不同。<em>WritableFile</em> 是一个抽象类，在 Windows 下其实现为 <em>WindowsWritableFile</em>；在 Mac 和 Linux 系统下，其实现是 <code>PosixWritableFile</code> 。它们的区别在于写入数据时调用的系统调用不一样，编译时编译器会根据操作系统的信息来选择不同的实现。</p>
+<h1 id="读日志"><a href="#读日志" class="headerlink" title="读日志"></a>读日志</h1><p>当系统在恢复时，需要读取硬盘上的日志然后恢复之前由于进程异常退出丢失的操作。下面我们来讲讲 LevelDB 是如何读取日志的。在前面写入日志时，代码都是中 log_writer.cc 中的。对应的，在读取日志时，也有一个 log_reader.cc 中的 <em>Reader</em> 类负责将日志读出并解析。在这个类中有一个函数 <code>ReadRecord</code> 直接读取下一条日志并返回，下面我们看看这个函数的内容</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// log_reader.cc</span></span><br><span class="line"><span class="function"><span class="keyword">bool</span> <span class="title">Reader::ReadRecord</span><span class="params">(Slice* record, std::string* scratch)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// ------------ Start of Code Fragment A -------------</span></span><br><span class="line">  <span class="comment">// 如果 last_record_offset_ 小于 initial_offset_</span></span><br><span class="line">  <span class="comment">// 那么 initial_offset 大于 0，并且第一个 chunk 还没有被读取</span></span><br><span class="line">  <span class="comment">// 所以直接跳转到第一个 chunk 开始的位置</span></span><br><span class="line">  <span class="keyword">if</span> (last_record_offset_ &lt; initial_offset_) &#123;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">SkipToInitialBlock</span>()) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// scratch 用于缓存一条日志的数据</span></span><br><span class="line">  scratch-&gt;<span class="built_in">clear</span>();</span><br><span class="line">  record-&gt;<span class="built_in">clear</span>();</span><br><span class="line">  <span class="keyword">bool</span> in_fragmented_record = <span class="literal">false</span>;</span><br><span class="line">  <span class="comment">// Record offset of the logical record that we&#x27;re reading</span></span><br><span class="line">  <span class="comment">// 0 is a dummy value to make compilers happy</span></span><br><span class="line">  <span class="comment">// 记录当前正在读的这条日志在文件中的 offset</span></span><br><span class="line">  <span class="keyword">uint64_t</span> prospective_record_offset = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">  Slice fragment;</span><br><span class="line">  <span class="comment">// ------------ End of Code Fragment A -------------</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">  <span class="comment">// ------------ Start of Code Fragment B -------------</span></span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">unsigned</span> <span class="keyword">int</span> record_type = <span class="built_in">ReadPhysicalRecord</span>(&amp;fragment);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// ReadPhysicalRecord may have only had an empty trailer remaining in its</span></span><br><span class="line">    <span class="comment">// internal buffer. Calculate the offset of the next physical record now</span></span><br><span class="line">    <span class="comment">// that it has returned, properly accounting for its header size.</span></span><br><span class="line">    <span class="comment">// physical_record_offset 就是当前读出来的这个 chunk 在文件中开始的位置</span></span><br><span class="line">    <span class="keyword">uint64_t</span> physical_record_offset =</span><br><span class="line">        end_of_buffer_offset_ - buffer_.<span class="built_in">size</span>() - kHeaderSize - fragment.<span class="built_in">size</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (resyncing_) &#123;</span><br><span class="line">      <span class="keyword">if</span> (record_type == kMiddleType) &#123;</span><br><span class="line">        <span class="keyword">continue</span>;</span><br><span class="line">      &#125; <span class="keyword">else</span> <span class="keyword">if</span> (record_type == kLastType) &#123;</span><br><span class="line">        resyncing_ = <span class="literal">false</span>;</span><br><span class="line">        <span class="keyword">continue</span>;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        resyncing_ = <span class="literal">false</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in"><span class="keyword">switch</span></span> (record_type) &#123;</span><br><span class="line">      <span class="keyword">case</span> kFullType:</span><br><span class="line">        <span class="comment">// 如果读到了 FullType 的 Chunk,那么就已经读到了一整条日志，直接返回</span></span><br><span class="line">        <span class="keyword">if</span> (in_fragmented_record) &#123;</span><br><span class="line">          <span class="comment">// Handle bug in earlier versions of log::Writer where</span></span><br><span class="line">          <span class="comment">// it could emit an empty kFirstType record at the tail end</span></span><br><span class="line">          <span class="comment">// of a block followed by a kFullType or kFirstType record</span></span><br><span class="line">          <span class="comment">// at the beginning of the next block.</span></span><br><span class="line">          <span class="keyword">if</span> (!scratch-&gt;<span class="built_in">empty</span>()) &#123;</span><br><span class="line">            <span class="built_in">ReportCorruption</span>(scratch-&gt;<span class="built_in">size</span>(), <span class="string">&quot;partial record without end(1)&quot;</span>);</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        prospective_record_offset = physical_record_offset;</span><br><span class="line">        scratch-&gt;<span class="built_in">clear</span>();</span><br><span class="line">        *record = fragment;</span><br><span class="line">        last_record_offset_ = prospective_record_offset;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> kFirstType:</span><br><span class="line">        <span class="comment">// 如果读到了 firstType 的 Chunk,那么就要将 in_fragmented_record 置为 true</span></span><br><span class="line">        <span class="comment">// 然后继续往下读，直到读到了一条 Last 类型的 chunk</span></span><br><span class="line">        <span class="keyword">if</span> (in_fragmented_record) &#123;</span><br><span class="line">          <span class="comment">// Handle bug in earlier versions of log::Writer where</span></span><br><span class="line">          <span class="comment">// it could emit an empty kFirstType record at the tail end</span></span><br><span class="line">          <span class="comment">// of a block followed by a kFullType or kFirstType record</span></span><br><span class="line">          <span class="comment">// at the beginning of the next block.</span></span><br><span class="line">          <span class="keyword">if</span> (!scratch-&gt;<span class="built_in">empty</span>()) &#123;</span><br><span class="line">            <span class="built_in">ReportCorruption</span>(scratch-&gt;<span class="built_in">size</span>(), <span class="string">&quot;partial record without end(2)&quot;</span>);</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        prospective_record_offset = physical_record_offset;</span><br><span class="line">        scratch-&gt;<span class="built_in">assign</span>(fragment.<span class="built_in">data</span>(), fragment.<span class="built_in">size</span>());</span><br><span class="line">        in_fragmented_record = <span class="literal">true</span>;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> kMiddleType:</span><br><span class="line">        <span class="comment">// 如果读到了 Middle 类型的 Chunk,将内容添加进 scratch 中，然后接着往下读</span></span><br><span class="line">        <span class="comment">// 直到读到了一条 Last 类型的 Chunk</span></span><br><span class="line">        <span class="keyword">if</span> (!in_fragmented_record) &#123;</span><br><span class="line">          <span class="built_in">ReportCorruption</span>(fragment.<span class="built_in">size</span>(),</span><br><span class="line">                           <span class="string">&quot;missing start of fragmented record(1)&quot;</span>);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          scratch-&gt;<span class="built_in">append</span>(fragment.<span class="built_in">data</span>(), fragment.<span class="built_in">size</span>());</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> kLastType:</span><br><span class="line">        <span class="comment">// 读到了一条 Last 类型的日志，将这条日志的内容以及前面缓存的日志一起拼接起来</span></span><br><span class="line">        <span class="comment">// 形成一条完整的日志并且返回</span></span><br><span class="line">        <span class="keyword">if</span> (!in_fragmented_record) &#123;</span><br><span class="line">          <span class="built_in">ReportCorruption</span>(fragment.<span class="built_in">size</span>(),</span><br><span class="line">                           <span class="string">&quot;missing start of fragmented record(2)&quot;</span>);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          scratch-&gt;<span class="built_in">append</span>(fragment.<span class="built_in">data</span>(), fragment.<span class="built_in">size</span>());</span><br><span class="line">          *record = <span class="built_in">Slice</span>(*scratch);</span><br><span class="line">          last_record_offset_ = prospective_record_offset;</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> kEof:</span><br><span class="line">        <span class="keyword">if</span> (in_fragmented_record) &#123;</span><br><span class="line">          <span class="comment">// This can be caused by the writer dying immediately after</span></span><br><span class="line">          <span class="comment">// writing a physical record but before completing the next; don&#x27;t// scratch 用于缓存一条日志的数据</span></span><br><span class="line">          <span class="comment">// treat it as a corruption, just ignore the entire logical record.</span></span><br><span class="line">          scratch-&gt;<span class="built_in">clear</span>();</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">case</span> kBadRecord:</span><br><span class="line">        <span class="keyword">if</span> (in_fragmented_record) &#123;</span><br><span class="line">          <span class="built_in">ReportCorruption</span>(scratch-&gt;<span class="built_in">size</span>(), <span class="string">&quot;error in middle of record&quot;</span>);</span><br><span class="line">          in_fragmented_record = <span class="literal">false</span>;</span><br><span class="line">          scratch-&gt;<span class="built_in">clear</span>();</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">default</span>: &#123;</span><br><span class="line">        <span class="keyword">char</span> buf[<span class="number">40</span>];</span><br><span class="line">        std::<span class="built_in">snprintf</span>(buf, <span class="built_in"><span class="keyword">sizeof</span></span>(buf), <span class="string">&quot;unknown record type %u&quot;</span>, record_type);</span><br><span class="line">        <span class="built_in">ReportCorruption</span>(</span><br><span class="line">            (fragment.<span class="built_in">size</span>() + (in_fragmented_record ? scratch-&gt;<span class="built_in">size</span>() : <span class="number">0</span>)),</span><br><span class="line">            buf);</span><br><span class="line">        in_fragmented_record = <span class="literal">false</span>;</span><br><span class="line">        scratch-&gt;<span class="built_in">clear</span>();</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// ------------ End of Code Fragment B -------------</span></span><br><span class="line">  <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个函数中主要分为两个部分，A 部分的代码主要是一些准备工作，例如将文件的 offset 移动到第一个 Chunk 的起始位置，清空缓冲区等；B 部分代码的工作是不断地读出下一个 Chunk 的内容，根据这个 Chunk 的类型来判断是否需要继续读下一个 Chunk（读到了 First 类型或者 Middle 类型的 Chunk）,如果一条日志的内容读取完了（读到了 Full 类型或者 Last 类型的 Chunk），就将缓冲区中的数据组装成一个 <em>Slice</em> 对象返回，这个对象中的内容就是一条逻辑日志的完整内容。</p>
+<p>读取下一个 Chunk 的执行逻辑主要在 <code>ReadPhysicalRecord</code> 函数中，它的内容如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// log_reader.cc</span></span><br><span class="line"><span class="comment">// 从 buffer 中读取一个 Chunk，返回这个 chunk 的类型</span></span><br><span class="line"><span class="comment">// 如果当前 buffer 已经读完，则会从文件中读取下一个 Block 的内容到 buffer 中</span></span><br><span class="line"><span class="comment">// 如果文件的内容也被读完了，则返回 eof</span></span><br><span class="line"><span class="function"><span class="keyword">unsigned</span> <span class="keyword">int</span> <span class="title">Reader::ReadPhysicalRecord</span><span class="params">(Slice* result)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">// ------------ Start of Code Fragment A -------------</span></span><br><span class="line">    <span class="comment">// 如果 buffer 中剩余的数据大小小于一个 ChunkHeader 的大小</span></span><br><span class="line">    <span class="comment">// 则说明剩下的都是 trailer，直接跳到下一个 Block</span></span><br><span class="line">    <span class="keyword">if</span> (buffer_.<span class="built_in">size</span>() &lt; kHeaderSize) &#123;</span><br><span class="line">      <span class="keyword">if</span> (!eof_) &#123;</span><br><span class="line">        <span class="comment">// Last read was a full read, so this is a trailer to skip</span></span><br><span class="line">        buffer_.<span class="built_in">clear</span>();</span><br><span class="line">        <span class="comment">// 读取下一个 Block</span></span><br><span class="line">        Status status = file_-&gt;<span class="built_in">Read</span>(kBlockSize, &amp;buffer_, backing_store_);</span><br><span class="line">        end_of_buffer_offset_ += buffer_.<span class="built_in">size</span>();</span><br><span class="line">        <span class="keyword">if</span> (!status.<span class="built_in">ok</span>()) &#123;</span><br><span class="line">          buffer_.<span class="built_in">clear</span>();</span><br><span class="line">          <span class="built_in">ReportDrop</span>(kBlockSize, status);</span><br><span class="line">          eof_ = <span class="literal">true</span>;</span><br><span class="line">          <span class="keyword">return</span> kEof;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (buffer_.<span class="built_in">size</span>() &lt; kBlockSize) &#123;</span><br><span class="line">          eof_ = <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">continue</span>;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// Note that if buffer_ is non-empty, we have a truncated header at the</span></span><br><span class="line">        <span class="comment">// end of the file, which can be caused by the writer crashing in the</span></span><br><span class="line">        <span class="comment">// middle of writing the header. Instead of considering this an error,</span></span><br><span class="line">        <span class="comment">// just report EOF.</span></span><br><span class="line">        buffer_.<span class="built_in">clear</span>();</span><br><span class="line">        <span class="keyword">return</span> kEof;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ------------ End of Code Fragment A -------------</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------ Start of Code Fragment B -------------</span></span><br><span class="line">    <span class="comment">// Parse the header</span></span><br><span class="line">    <span class="comment">// 获取当前 Chunk 的 type 和 data length</span></span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">char</span>* header = buffer_.<span class="built_in">data</span>();</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">uint32_t</span> a = <span class="keyword">static_cast</span>&lt;<span class="keyword">uint32_t</span>&gt;(header[<span class="number">4</span>]) &amp; <span class="number">0xff</span>;</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">uint32_t</span> b = <span class="keyword">static_cast</span>&lt;<span class="keyword">uint32_t</span>&gt;(header[<span class="number">5</span>]) &amp; <span class="number">0xff</span>;</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">unsigned</span> <span class="keyword">int</span> type = header[<span class="number">6</span>];</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">uint32_t</span> length = a | (b &lt;&lt; <span class="number">8</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 如果 Header 的大小加上数据部分的大小比 buffer 中数据的大小还大</span></span><br><span class="line">    <span class="comment">// 说明数据的读取发生了异常，报告异常并返回</span></span><br><span class="line">    <span class="keyword">if</span> (kHeaderSize + length &gt; buffer_.<span class="built_in">size</span>()) &#123;</span><br><span class="line">      <span class="keyword">size_t</span> drop_size = buffer_.<span class="built_in">size</span>();</span><br><span class="line">      buffer_.<span class="built_in">clear</span>();</span><br><span class="line">      <span class="keyword">if</span> (!eof_) &#123;</span><br><span class="line">        <span class="built_in">ReportCorruption</span>(drop_size, <span class="string">&quot;bad record length&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> kBadRecord;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">// If the end of the file has been reached without reading |length| bytes</span></span><br><span class="line">      <span class="comment">// of payload, assume the writer died in the middle of writing the record.</span></span><br><span class="line">      <span class="comment">// Don&#x27;t report a corruption.</span></span><br><span class="line">      <span class="keyword">return</span> kEof;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (type == kZeroType &amp;&amp; length == <span class="number">0</span>) &#123;</span><br><span class="line">      <span class="comment">// Skip zero length record without reporting any drops since</span></span><br><span class="line">      <span class="comment">// such records are produced by the mmap based writing code in</span></span><br><span class="line">      <span class="comment">// env_posix.cc that preallocates file regions.</span></span><br><span class="line">      buffer_.<span class="built_in">clear</span>();</span><br><span class="line">      <span class="keyword">return</span> kBadRecord;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Check crc</span></span><br><span class="line">    <span class="comment">// 检查校验和，如果校验和不对，那么也报告异常</span></span><br><span class="line">    <span class="keyword">if</span> (checksum_) &#123;</span><br><span class="line">      <span class="keyword">uint32_t</span> expected_crc = crc32c::<span class="built_in">Unmask</span>(<span class="built_in">DecodeFixed32</span>(header));</span><br><span class="line">      <span class="keyword">uint32_t</span> actual_crc = crc32c::<span class="built_in">Value</span>(header + <span class="number">6</span>, <span class="number">1</span> + length);</span><br><span class="line">      <span class="keyword">if</span> (actual_crc != expected_crc) &#123;</span><br><span class="line">        <span class="comment">// Drop the rest of the buffer since &quot;length&quot; itself may have</span></span><br><span class="line">        <span class="comment">// been corrupted and if we trust it, we could find some</span></span><br><span class="line">        <span class="comment">// fragment of a real log record that just happens to look</span></span><br><span class="line">        <span class="comment">// like a valid log record.</span></span><br><span class="line">        <span class="keyword">size_t</span> drop_size = buffer_.<span class="built_in">size</span>();</span><br><span class="line">        buffer_.<span class="built_in">clear</span>();</span><br><span class="line">        <span class="built_in">ReportCorruption</span>(drop_size, <span class="string">&quot;checksum mismatch&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> kBadRecord;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ------------ End of Code Fragment B -------------</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// ------------ Start of Code Fragment C -------------</span></span><br><span class="line">    <span class="comment">// 读取成功，将当前 Block 的 offset 往前移动到下一条 Chunk 的开头</span></span><br><span class="line">    buffer_.<span class="built_in">remove_prefix</span>(kHeaderSize + length);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Skip physical record that started before initial_offset_</span></span><br><span class="line">    <span class="keyword">if</span> (end_of_buffer_offset_ - buffer_.<span class="built_in">size</span>() - kHeaderSize - length &lt;</span><br><span class="line">        initial_offset_) &#123;</span><br><span class="line">      result-&gt;<span class="built_in">clear</span>();</span><br><span class="line">      <span class="keyword">return</span> kBadRecord;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    *result = <span class="built_in">Slice</span>(header + kHeaderSize, length);</span><br><span class="line">    <span class="keyword">return</span> type;</span><br><span class="line">    <span class="comment">// ------------ End of Code Fragment C -------------</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码中，主要包含三部分逻辑。A 部分主要判断当前 Block 中是否还有下一条日志，如果没有则切换到下一个 Block 。如果无法读取下一个 Block 或者下一个 Block 的大小小于一个标准 Block 的大小（32 KB），则说明文件已经读完，将 eof 标志置为 true 。B 部分代码主要是根据还原 ChunkHeader,并且根据数据长度、校验和等信息判断 Chunk 中数据的正确性。程序运行到 C 部分代码则表示前面的读取和校验都没有问题，那么只需要将 buffer 的 offset 前移，然后将读取到的内容包装成一个 <em>Slice</em> 返回即可。以上三段代码便组成了从 Block 中读取一个 Chunk 的逻辑。</p>
+<p>在 A 部分代码中，如果当前 buffer（即当前内存中的 Block）已经读到了末尾，那么就需要从文件中载入下一个 Block 。这里使用的函数是 <code>SequentialFile::Read</code> ，这个函数就是简单地使用系统调用从文件中读取了一段数据出来，因此也就不展开讲了。</p>
+<p>到这里，LevelDB 的 WAL 日志就讲完了。应该说整个逻辑还是比较清晰易懂的，主要就是一些编解码的过程。仔细体会这个过程，对我们理解数据编码解码还是很有帮助的。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+      <div>
+        <ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者：</strong>
+    Mark Lau
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/" title="LevelDB 源代码阅读（三）：预写日志">http://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>
+    本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" rel="external nofollow" target="_blank">CC BY-NC-SA 3.0</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+
+      </div>
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/07/10/Leveldb-source-code-reading-2/" rel="next" title="LevelDB 源代码阅读（二）：读流程">
+                <i class="fa fa-chevron-left"></i> LevelDB 源代码阅读（二）：读流程
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/07/13/SkipList/" rel="prev" title="跳表：平衡树的概率替代方案">
+                跳表：平衡树的概率替代方案 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image"
+                src="/images/me.jpg"
+                alt="" />
+            
+              <p class="site-author-name" itemprop="name"></p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/%7C%7Carchive">
+              
+                  <span class="site-state-item-count">15</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">16</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+
+          </nav>
+
+          
+
+          
+            <div class="links-of-author motion-element">
+                
+                  <span class="links-of-author-item">
+                    <a href="https://github.com/THUMarkLau" target="_blank" title="GitHub">
+                      
+                        <i class="fa fa-fw fa-github"></i>GitHub</a>
+                  </span>
+                
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#WAL%EF%BC%9A%E9%A2%84%E5%86%99%E6%97%A5%E5%BF%97"><span class="nav-number">1.</span> <span class="nav-text">WAL：预写日志</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#LevelDB-%E4%B8%AD%E7%9A%84-WAL-%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.</span> <span class="nav-text">LevelDB 中的 WAL 实现</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#LevelDB-%E7%9A%84%E6%97%A5%E5%BF%97%E7%BB%93%E6%9E%84"><span class="nav-number">2.1.</span> <span class="nav-text">LevelDB 的日志结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%99%E6%97%A5%E5%BF%97"><span class="nav-number">2.2.</span> <span class="nav-text">写日志</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AF%BB%E6%97%A5%E5%BF%97"><span class="nav-number">3.</span> <span class="nav-text">读日志</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Liu Xuxin</span>
+
+  
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-area-chart"></i>
+    </span>
+    
+      <span class="post-meta-item-text">Site words total count&#58;</span>
+    
+    <span title="Site words total count">37700</span>
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+  
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({
+        tex2jax: {
+          inlineMath: [ ['$','$'], ["\\(","\\)"]  ],
+          processEscapes: true,
+          skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        }
+      });
+    </script>
+
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for (i=0; i < all.length; i += 1) {
+          all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+      });
+    </script>
+    <script type="text/javascript" src="//cdn.bootcss.com/mathjax/2.7.1/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+  
+
+
+  
+
+  
+
+</body>
+</html>
