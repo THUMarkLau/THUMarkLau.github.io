@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+  
+  
+  <link rel="stylesheet" media="all" href="/lib/Han/dist/han.min.css?v=3.3">
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT" />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在 LevelDB 源代码阅读（一）：写流程 中，我们在介绍写入时最终讲到写入的数据被编码成 internalKey 然后被插入到 SkipList 中。在本文中，我们将结合 LevelDB 的源代码，详细介绍 MemTable 的结构。 MemTable 基本结构代码中有关于 MemTable 的定义和实现在 memtable.{h&#x2F;cc} 中，我们先从 MemTable 的定义开始了解其基础结">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB 源代码阅读（四）：MemTable">
+<meta property="og:url" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/index.html">
+<meta property="og:site_name" content="马克刘的学习记录">
+<meta property="og:description" content="在 LevelDB 源代码阅读（一）：写流程 中，我们在介绍写入时最终讲到写入的数据被编码成 internalKey 然后被插入到 SkipList 中。在本文中，我们将结合 LevelDB 的源代码，详细介绍 MemTable 的结构。 MemTable 基本结构代码中有关于 MemTable 的定义和实现在 memtable.{h&#x2F;cc} 中，我们先从 MemTable 的定义开始了解其基础结">
+<meta property="og:locale">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/Leveldb-internal_key.png">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/Figure1.png">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/Figure3.png">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/Figure2.png">
+<meta property="og:image" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/Figure4.png">
+<meta property="article:published_time" content="2021-07-15T14:55:15.000Z">
+<meta property="article:modified_time" content="2021-07-17T11:43:39.674Z">
+<meta property="article:author" content="Mark Lau">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/Leveldb-internal_key.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"always","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/"/>
+
+
+
+
+
+  <title>LevelDB 源代码阅读（四）：MemTable | 马克刘的学习记录</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">马克刘的学习记录</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/me.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="马克刘的学习记录">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">LevelDB 源代码阅读（四）：MemTable</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-07-15T22:55:15+08:00">
+                2021-07-15
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index">
+                    <span itemprop="name">数据库</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/" itemprop="url" rel="index">
+                    <span itemprop="name">源代码阅读</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/LevelDB/" itemprop="url" rel="index">
+                    <span itemprop="name">LevelDB</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+            <div class="post-wordcount">
+              
+                
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-file-word-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">字数统计&#58;</span>
+                
+                <span title="字数统计">
+                  4326 字
+                </span>
+              
+
+              
+                <span class="post-meta-divider">|</span>
+              
+
+              
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-clock-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">阅读时长 &asymp;</span>
+                
+                <span title="阅读时长">
+                  18 分钟
+                </span>
+              
+            </div>
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body han-init-context" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在 <a href="/2021/07/08/leveldb-source-code-reading-1/" title="LevelDB 源代码阅读（一）：写流程">LevelDB 源代码阅读（一）：写流程</a> 中，我们在介绍写入时最终讲到写入的数据被编码成 internalKey 然后被插入到 <em>SkipList</em> 中。在本文中，我们将结合 LevelDB 的源代码，详细介绍 MemTable 的结构。</p>
+<h1 id="MemTable-基本结构"><a href="#MemTable-基本结构" class="headerlink" title="MemTable 基本结构"></a>MemTable 基本结构</h1><p>代码中有关于 <em>MemTable</em> 的定义和实现在 memtable.{h/cc} 中，我们先从 <em>MemTable</em> 的定义开始了解其基础结构和功能。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// memtable.h</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">MemTable</span> &#123;</span></span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="function"><span class="keyword">explicit</span> <span class="title">MemTable</span><span class="params">(<span class="keyword">const</span> InternalKeyComparator&amp; comparator)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">void</span> <span class="title">Ref</span><span class="params">()</span> </span>&#123; ++refs_; &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">void</span> <span class="title">Unref</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    --refs_;</span><br><span class="line">    <span class="built_in">assert</span>(refs_ &gt;= <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (refs_ &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">      <span class="keyword">delete</span> <span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">size_t</span> <span class="title">ApproximateMemoryUsage</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function">Iterator* <span class="title">NewIterator</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">void</span> <span class="title">Add</span><span class="params">(SequenceNumber seq, ValueType type, <span class="keyword">const</span> Slice&amp; key,</span></span></span><br><span class="line"><span class="params"><span class="function">           <span class="keyword">const</span> Slice&amp; value)</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">bool</span> <span class="title">Get</span><span class="params">(<span class="keyword">const</span> LookupKey&amp; key, std::string* value, Status* s)</span></span>;</span><br><span class="line">  </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">KeyComparator</span> &#123;</span></span><br><span class="line">    <span class="keyword">const</span> InternalKeyComparator comparator;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">KeyComparator</span><span class="params">(<span class="keyword">const</span> InternalKeyComparator&amp; c)</span> : comparator(c) &#123;</span>&#125;</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(<span class="keyword">const</span> <span class="keyword">char</span>* a, <span class="keyword">const</span> <span class="keyword">char</span>* b)</span> <span class="keyword">const</span></span>;</span><br><span class="line">  &#125;;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">typedef</span> SkipList&lt;<span class="keyword">const</span> <span class="keyword">char</span>*, KeyComparator&gt; Table;</span><br><span class="line"></span><br><span class="line">  ~<span class="built_in">MemTable</span>();</span><br><span class="line"></span><br><span class="line">  KeyComparator comparator_;</span><br><span class="line">  <span class="keyword">int</span> refs_;</span><br><span class="line">  Arena arena_;</span><br><span class="line">  Table table_;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><em>MemTable</em> 是一个有引用计数的类型，当其引用计数为 0 时（除了刚创建时）就会从内存中删除。<code>Ref</code> 函数和 <code>Unref</code> 函数就是用以管理引用计数的函数。<code>ApproximateMemoryUsage</code> 函数会计算当前 <em>MemTable</em> 的内存占用值，但是这个值不是精确的。<code>NewIterator</code> 函数会返回一个 <em>Iterator</em> 对象，用以正序遍历 <em>MemTable</em> 中的数据。<code>Add</code> 函数和 <code>Get</code> 的函数则分别对应写数据和读数据，注意 <code>Add</code> 函数既包含了新增值或修改值，也包含删除值。在数据部分，<em>MemTable</em> 维护了四个私有变量：<em>comparator_<em>、</em>refs_<em>、</em>arena_</em> 和 <em>table_</em> 。<em>comparator_</em> 的定义就在 <em>MemTable</em> 中，它重载了 <code>()</code> 运算符，可以像函数一样被调用，主要用以比较 <em>MemTable</em> 中 key 的大小，以便对 key 进行排序。<em>refs_</em> 是一个整数类型的值，用以维护引用计数。<em>arena_</em> 是一个 <em>Arena</em> 对象，主要用于管理内存。<em>table_</em> 是一个 <em>SkipList</em> 类，是 <em>MemTable</em> 中实际存储数据的结构。</p>
+<img src="/2021/07/15/leveldb-source-code-reading-4/Leveldb-internal_key.png" width="65%">
+
+<p>在 <a href="/2021/07/08/leveldb-source-code-reading-1/" title="LevelDB 源代码阅读（一）：写流程">LevelDB 源代码阅读（一）：写流程</a> 中我们已经简要介绍过了 <em>MemTable</em> 的写入过程：写入的 key 和 value（删除则没有 value）以及写入操作对应的 sequence number 会编码成一个如图所示的 entry ，然后这个 entry 会被插入到 <em>table_</em> 中（即 SkipList 中）。关于 SkipList 的结构以及如何在 SkipList 中插入数据，我们在下面一节中描述。</p>
+<p><em>MemTable</em> 的读操作代码如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// memtable.cc</span></span><br><span class="line"><span class="function"><span class="keyword">bool</span> <span class="title">MemTable::Get</span><span class="params">(<span class="keyword">const</span> LookupKey&amp; key, std::string* value, Status* s)</span> </span>&#123;</span><br><span class="line">  Slice memkey = key.<span class="built_in">memtable_key</span>();</span><br><span class="line">  <span class="function">Table::Iterator <span class="title">iter</span><span class="params">(&amp;table_)</span></span>;</span><br><span class="line">  iter.<span class="built_in">Seek</span>(memkey.<span class="built_in">data</span>());</span><br><span class="line">  <span class="keyword">if</span> (iter.<span class="built_in">Valid</span>()) &#123;</span><br><span class="line">    <span class="comment">// entry format is:</span></span><br><span class="line">    <span class="comment">//    klength  varint32</span></span><br><span class="line">    <span class="comment">//    userkey  char[klength]</span></span><br><span class="line">    <span class="comment">//    tag      uint64</span></span><br><span class="line">    <span class="comment">//    vlength  varint32</span></span><br><span class="line">    <span class="comment">//    value    char[vlength]</span></span><br><span class="line">    <span class="comment">// Check that it belongs to same user key.  We do not check the</span></span><br><span class="line">    <span class="comment">// sequence number since the Seek() call above should have skipped</span></span><br><span class="line">    <span class="comment">// all entries with overly large sequence numbers.</span></span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">char</span>* entry = iter.<span class="built_in">key</span>();</span><br><span class="line">    <span class="keyword">uint32_t</span> key_length;</span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">char</span>* key_ptr = <span class="built_in">GetVarint32Ptr</span>(entry, entry + <span class="number">5</span>, &amp;key_length);</span><br><span class="line">    <span class="keyword">if</span> (comparator_.comparator.<span class="built_in">user_comparator</span>()-&gt;<span class="built_in">Compare</span>(</span><br><span class="line">            <span class="built_in">Slice</span>(key_ptr, key_length - <span class="number">8</span>), key.<span class="built_in">user_key</span>()) == <span class="number">0</span>) &#123;</span><br><span class="line">      <span class="comment">// Correct user key</span></span><br><span class="line">      <span class="keyword">const</span> <span class="keyword">uint64_t</span> tag = <span class="built_in">DecodeFixed64</span>(key_ptr + key_length - <span class="number">8</span>);</span><br><span class="line">      <span class="built_in"><span class="keyword">switch</span></span> (<span class="keyword">static_cast</span>&lt;ValueType&gt;(tag &amp; <span class="number">0xff</span>)) &#123;</span><br><span class="line">        <span class="keyword">case</span> kTypeValue: &#123;</span><br><span class="line">          Slice v = <span class="built_in">GetLengthPrefixedSlice</span>(key_ptr + key_length);</span><br><span class="line">          value-&gt;<span class="built_in">assign</span>(v.<span class="built_in">data</span>(), v.<span class="built_in">size</span>());</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">case</span> kTypeDeletion:</span><br><span class="line">          *s = Status::<span class="built_in">NotFound</span>(<span class="built_in">Slice</span>());</span><br><span class="line">          <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>代码中首先声明了一个 <em>table_</em> 的迭代器 <em>iter</em> ，然后调用迭代器的 <code>Seek</code> 函数，寻找 SkipList 中有对应 <em>Key</em> 的节点。由于 SkipList 是有序的，这里 <em>iter</em> 找到的节点是所有拥有待搜索键且其 sequence number 大于此次操作的 sequence number 的节点中 sequence number 最大的一个，因此其数据也是最新的。找到这个节点之后，将这个节点进行解析，获取其 key 的值以及节点对应的操作类型。如果节点对应的操作类型是 insert ，那么则返回 insert 对应的 value ；如果是 delete ，那么则返回空。</p>
+<p>不难看出，<em>MemTable</em> 无论是写还是读，其涉及到的核心组件就是 SkipList 。那么 SkipList 是一种怎么样的数据结构呢，又是如何实现的呢，下面让我们一起来看一看。</p>
+<h1 id="跳表-SkipList"><a href="#跳表-SkipList" class="headerlink" title="跳表 SkipList"></a>跳表 SkipList</h1><p>跳表的英文名称是 SkipList ，最早由 William Pugh 在论文 <a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/78973.78977">SkipList: A Probabilistic Alternative to Balanaced Tree</a> 中提出。在 <a href="/2021/07/13/SkipList/" title="跳表：平衡树的概率替代方案">跳表：平衡树的概率替代方案</a> 一文中，笔者对 SkipList 这篇论文涉及到数据结构与算法的前半部分进行了翻译，有兴趣的读者可以自行阅读论文原文或者翻译。</p>
+<p>简单来说，SkipList 就是有序链表加上索引。如图 1a ，这是一个顺序链表。虽然所有的元素已经排好序，但是如果我们想要从中查找一个元素，还是需要将所有元素遍历一遍，直到找到我们想要的元素为止。例如我们需要查找 19，那么总共需要遍历 7 个元素。</p>
+<div style="font-size:11px; text-align:center; line-height: 0px">
+<img src="/2021/07/15/leveldb-source-code-reading-4/Figure1.png" width="65%">
+
+<p><em>图 1</em></p>
+</div>
+
+<p>下面我们考虑给链表增加索引：如果隔一个元素，我们就增加一个索引，使其指向下一个具有索引的节点，那我们就获得了图 1b 所示的链表。在这个链表中进行查找，首先我们从高层指针开始查找，如果高层指针指向的下一个元素的值小于等于我们的预期值，那么我们就跳转到这个指针指向的元素；否则，我们就检查下一个层级的指针是否满足条件。如果我们已经在一级指针了，那么当前所在的元素就是我们要找的元素（如果元素存在）。如在图 1b 中我们要查找 19 ，那么经过的节点顺序是 头节点 -&gt; 6 -&gt; 9 -&gt; 17（17 的二级指针指向的下一个元素为 21 ，大于 19 ，因此我们转换到一级指针进行搜索）-&gt; 19 （19 的一级指针指向的下一个元素为 21 ，大于 19 ，那么此时所在的节点就是我们要搜索的节点）。不算头节点，总共遍历了 4 个元素。</p>
+<p>那我们还可以继续优化吗？当然可以！我们先定义一个概念，一个拥有 n 个指针的链表节点称为 n 级节点。前面所述的情况有两种节点：一级节点和二级节点。我们可以在二级指针的基础上，增加一个三级指针，相当于三级索引。假如每隔 1 个元素，就有一个二级节点，其指向下一个级别大于等于二的节点；每隔三个元素，就有一个三级节点，其指向下一个为三的节点。这样，我们就得到了图 1c 的链表。搜索的顺序同样是从高级别指针开始向低级别指针搜索，在这个链表中查找 19 的路径为：头节点 -&gt; 9（在这里先检查三级指针指向的下一个元素，其值为 21 ，大于我们要搜索的 19 ，因此切换到二级指针进行检查） -&gt; 17 （在这里先检查二级指针，其指向的下一个元素的值为 21 ，大于我们要搜索的 19 ，因此切换到一级指针进行检查） -&gt; 19 （在这里检查一级指针指向的下一个元素，其值为 21 ，大于我们要搜索的 19 ，因此这个节点就是我们要搜索的节点）。加了三级指针以后，我们查找只遍历了 3 个节点。</p>
+<p>除了三级指针，我们还可以继续加上更多级别的指针，如图 1d 就有 4 级指针，查找到 19 要遍历 3 个节点。在以上这几种情况中，拥有 50% 的结点为 1 级节点，25% 的结点为 2 级节点，12.5% 的结点为 3 级节点，6.25% 的结点为 4 级节点。我们定义一个链表的级别为其中所有节点中最高级的那个节点的级别，图 1 a-d 的四个链表分别对应了一级到四级链表。随着链表的级别升高，各种级别的节点的比例是可计算的，为 $1/2^n$ ，其中 $n$ 为节点的级别。</p>
+<div style="font-size:11px; text-align:center; line-height: 0px">
+<img src="/2021/07/15/leveldb-source-code-reading-4/Figure3.png" width="65%">
+
+<p><em>图 2：跳表的插入流程</em></p>
+</div>
+
+<p>如果要遵循上面这种不同级别节点出现的位置都非常规律的规定（$n$ 级节点每隔 $2^n - 1$ 个节点出现一次），那么对链表进行插入和删除是非常麻烦的。跳表和这种索引链表的区别在于，跳表去掉了对不同级别的节点出现的位置的规定，仅要求它们的比例符合规定。如图 1e 就是一个跳表，其中不同级别节点出现的位置并不规定，但其总体分布遵循索引链表的分布。在插入时，一个新的节点的级别通过随机数进行生成，这个随机数的生成的分布要遵循索引链表的节点级别分布。生成节点后，我们通过搜索算法将这个节点插入，并设置好对应级别的指针，即完成了数据的插入。删除时先搜索到对应的节点并将其移除，然后设置好其他节点的指针即可。可以证明，跳表的搜索、插入和删除算法都是 $O(log(n))$ 的，其中 $n$ 为跳表中元素的数量。</p>
+<p>跳表的理论分析就分析到这，下面让我们来看看在 LevelDB 中跳表是如何实现的。</p>
+<h1 id="LevelDB-中的跳表"><a href="#LevelDB-中的跳表" class="headerlink" title="LevelDB 中的跳表"></a>LevelDB 中的跳表</h1><p>我们先来看看 <em>SkipList</em> 的声明：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// skiplist.h </span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Key, <span class="class"><span class="keyword">class</span> <span class="title">Comparator</span>&gt;</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">SkipList</span> &#123;</span></span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">Node</span>;</span></span><br><span class="line"></span><br><span class="line"> <span class="keyword">public</span>:</span><br><span class="line">  <span class="comment">// Create a new SkipList object that will use &quot;cmp&quot; for comparing keys,</span></span><br><span class="line">  <span class="comment">// and will allocate memory using &quot;*arena&quot;.  Objects allocated in the arena</span></span><br><span class="line">  <span class="comment">// must remain allocated for the lifetime of the skiplist object.</span></span><br><span class="line">  <span class="function"><span class="keyword">explicit</span> <span class="title">SkipList</span><span class="params">(Comparator cmp, Arena* arena)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">SkipList</span>(<span class="keyword">const</span> SkipList&amp;) = <span class="keyword">delete</span>;</span><br><span class="line">  SkipList&amp; <span class="keyword">operator</span>=(<span class="keyword">const</span> SkipList&amp;) = <span class="keyword">delete</span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Insert key into the list.</span></span><br><span class="line">  <span class="comment">// REQUIRES: nothing that compares equal to key is currently in the list.</span></span><br><span class="line">  <span class="function"><span class="keyword">void</span> <span class="title">Insert</span><span class="params">(<span class="keyword">const</span> Key&amp; key)</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Returns true iff an entry that compares equal to key is in the list.</span></span><br><span class="line">  <span class="function"><span class="keyword">bool</span> <span class="title">Contains</span><span class="params">(<span class="keyword">const</span> Key&amp; key)</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Iteration over the contents of a skip list</span></span><br><span class="line">  <span class="class"><span class="keyword">class</span> <span class="title">Iterator</span> &#123;</span></span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// Initialize an iterator over the specified list.</span></span><br><span class="line">    <span class="comment">// The returned iterator is not valid.</span></span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Iterator</span><span class="params">(<span class="keyword">const</span> SkipList* list)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Returns true iff the iterator is positioned at a valid node.</span></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">Valid</span><span class="params">()</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Returns the key at the current position.</span></span><br><span class="line">    <span class="comment">// REQUIRES: Valid()</span></span><br><span class="line">    <span class="function"><span class="keyword">const</span> Key&amp; <span class="title">key</span><span class="params">()</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Advances to the next position.</span></span><br><span class="line">    <span class="comment">// REQUIRES: Valid()</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Next</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Advances to the previous position.</span></span><br><span class="line">    <span class="comment">// REQUIRES: Valid()</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Prev</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Advance to the first entry with a key &gt;= target</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Seek</span><span class="params">(<span class="keyword">const</span> Key&amp; target)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Position at the first entry in list.</span></span><br><span class="line">    <span class="comment">// Final state of iterator is Valid() iff list is not empty.</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">SeekToFirst</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Position at the last entry in list.</span></span><br><span class="line">    <span class="comment">// Final state of iterator is Valid() iff list is not empty.</span></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">SeekToLast</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">const</span> SkipList* list_;</span><br><span class="line">    Node* node_;</span><br><span class="line">    <span class="comment">// Intentionally copyable</span></span><br><span class="line">  &#125;;</span><br><span class="line"></span><br><span class="line"> <span class="keyword">private</span>:</span><br><span class="line">  <span class="class"><span class="keyword">enum</span> &#123;</span> kMaxHeight = <span class="number">12</span> &#125;;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">inline</span> <span class="keyword">int</span> <span class="title">GetMaxHeight</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> max_height_.<span class="built_in">load</span>(std::memory_order_relaxed);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="function">Node* <span class="title">NewNode</span><span class="params">(<span class="keyword">const</span> Key&amp; key, <span class="keyword">int</span> height)</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">int</span> <span class="title">RandomHeight</span><span class="params">()</span></span>;</span><br><span class="line">  <span class="function"><span class="keyword">bool</span> <span class="title">Equal</span><span class="params">(<span class="keyword">const</span> Key&amp; a, <span class="keyword">const</span> Key&amp; b)</span> <span class="keyword">const</span> </span>&#123; <span class="keyword">return</span> (<span class="built_in">compare_</span>(a, b) == <span class="number">0</span>); &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Return true if key is greater than the data stored in &quot;n&quot;</span></span><br><span class="line">  <span class="function"><span class="keyword">bool</span> <span class="title">KeyIsAfterNode</span><span class="params">(<span class="keyword">const</span> Key&amp; key, Node* n)</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Return the earliest node that comes at or after key.</span></span><br><span class="line">  <span class="comment">// Return nullptr if there is no such node.</span></span><br><span class="line">  <span class="comment">//</span></span><br><span class="line">  <span class="comment">// If prev is non-null, fills prev[level] with pointer to previous</span></span><br><span class="line">  <span class="comment">// node at &quot;level&quot; for every level in [0..max_height_-1].</span></span><br><span class="line">  <span class="function">Node* <span class="title">FindGreaterOrEqual</span><span class="params">(<span class="keyword">const</span> Key&amp; key, Node** prev)</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Return the latest node with a key &lt; key.</span></span><br><span class="line">  <span class="comment">// Return head_ if there is no such node.</span></span><br><span class="line">  <span class="function">Node* <span class="title">FindLessThan</span><span class="params">(<span class="keyword">const</span> Key&amp; key)</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Return the last node in the list.</span></span><br><span class="line">  <span class="comment">// Return head_ if list is empty.</span></span><br><span class="line">  <span class="function">Node* <span class="title">FindLast</span><span class="params">()</span> <span class="keyword">const</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Immutable after construction</span></span><br><span class="line">  Comparator <span class="keyword">const</span> compare_;</span><br><span class="line">  Arena* <span class="keyword">const</span> arena_;  <span class="comment">// Arena used for allocations of nodes</span></span><br><span class="line"></span><br><span class="line">  Node* <span class="keyword">const</span> head_;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Modified only by Insert().  Read racily by readers, but stale</span></span><br><span class="line">  <span class="comment">// values are ok.</span></span><br><span class="line">  std::atomic&lt;<span class="keyword">int</span>&gt; max_height_;  <span class="comment">// Height of the entire list</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// Read/written only by Insert().</span></span><br><span class="line">  Random rnd_;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>首先我们看 SkipList 暴露给外界的接口，总共只有两个：<code>Insert</code> 和 <code>Contains</code> 。因此，SkipList 实际上并不支持删除操作。在所有对外暴露的接口中，自由 <code>Insert</code> 可以修改 SkipList 的结构。一个 Node 一旦被插入了 SkipList 中，那么其就无法再被移除了。并且，在插入时要求跳表中不存在与待插入键相同键的节点。注意，这里的键并不是用户在插入时给出的原始键，而是包含了 sequence number 的 internalKey ，理论上每个 internalKey 都是独一无二的。<em>Iterator</em> 类实际上提供了遍历 SkipList 和在 SkipList 中进行搜索的功能。在 <em>MemTable</em> 的 <code>Get</code> 函数中，就是通过 <em>Iterator</em> 来实现的，因此也可以算作 SkipList 对外暴露的接口。当然，这个接口也不会修改 SkipList 内部节点的数据。</p>
+<p>SkipList 内部的数据部分包含了六个对象：随机生成节点层级时的最大值 <em>kMaxHeight</em> 、用于比较不同键大小的比较器 <em>compare_</em> 、用于管理内存的 <em>arena_</em> 、跳表的头节点 <em>head_</em> 、当前跳表中所有节点的最高层级 <em>max_height_</em> 以及随机数生成器 <em>rnd_</em> 。在第二节中我们分析过，SkipList 的插入、删除（当然 LevelDB 中不包含删除）都是基于其查找功能实现的，因此我们就从 SkipList 查找的实现开始分析其源代码。</p>
+<h2 id="Search"><a href="#Search" class="headerlink" title="Search"></a>Search</h2><div style="font-size:11px; text-align:center; line-height: 0px">
+<img src="/2021/07/15/leveldb-source-code-reading-4/Figure2.png" width="65%">
+
+<p><em>图 3：跳表搜索算法伪代码</em></p>
+</div>
+
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// skiplist.h</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Key, <span class="class"><span class="keyword">class</span> <span class="title">Comparator</span>&gt;</span></span><br><span class="line"><span class="keyword">typename</span> SkipList&lt;Key, Comparator&gt;::Node*</span><br><span class="line">SkipList&lt;Key, Comparator&gt;::<span class="built_in">FindGreaterOrEqual</span>(<span class="keyword">const</span> Key&amp; key,</span><br><span class="line">                                              Node** prev) <span class="keyword">const</span> &#123;</span><br><span class="line">  Node* x = head_;</span><br><span class="line">  <span class="keyword">int</span> level = <span class="built_in">GetMaxHeight</span>() - <span class="number">1</span>;</span><br><span class="line">  <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    Node* next = x-&gt;<span class="built_in">Next</span>(level);</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">KeyIsAfterNode</span>(key, next)) &#123;</span><br><span class="line">      <span class="comment">// Keep searching in this list</span></span><br><span class="line">      x = next;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">if</span> (prev != <span class="literal">nullptr</span>) prev[level] = x;</span><br><span class="line">      <span class="keyword">if</span> (level == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> next;</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// Switch to next list</span></span><br><span class="line">        level--;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对比 SkipList 论文中给出的搜索算法的伪代码和 LevelDB 中 SkipList 的搜索算法，两者基本上是一致的。算法首先从头节点开始，从高级别指针开始搜索，如果当前指针指向的下一个元素小于等于待搜索的键，那么就移动到下一个节点中，继续检查这一级别的指针；如果下一个节点的值大于待搜索键，那么就搜索当前节点的下一个级别的指针。如果没有下一个级别的指针了，即 level 等于 0 ，那么当前节点就是我们要搜索的节点。如果跳表中有一个节点的键与待搜索键相同，那么这就是我们查找的结果；如果不存在这样的节点，那么最终搜索到的节点的键的值会大于待搜索键。和原始算法不一样的一点是，LevelDB 的实现中加入了一个 <em>Node</em>** 类型的 <em>prev</em> 变量。如果我们将最终搜索到的节点称为 <em>target_node</em> ，那么 <em>prev[i]</em> 就会指向跳表中位于 <em>target_node</em> 之前、距离 <em>target_node</em> 最近的级别大于等于 $i+1$ 的节点。如果在 <em>target_node</em> 之前没有级别大于 <em>prev[i]</em> 的节点，那么就会指向跳表的头节点。</p>
+<h2 id="Insert"><a href="#Insert" class="headerlink" title="Insert"></a>Insert</h2><p>看完了 SkipList 的搜索过程，下面我们一起看看插入过程：</p>
+<div style="font-size:11px; text-align:center; line-height: 0px">
+<img src="/2021/07/15/leveldb-source-code-reading-4/Figure4.png" width="40%">
+
+<p><em>图 4：跳表插入算法伪代码</em></p>
+</div>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// skiplist.h</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Key, <span class="class"><span class="keyword">class</span> <span class="title">Comparator</span>&gt;</span></span><br><span class="line"><span class="keyword">void</span> SkipList&lt;Key, Comparator&gt;::<span class="built_in">Insert</span>(<span class="keyword">const</span> Key&amp; key) &#123;</span><br><span class="line">  <span class="comment">// TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()</span></span><br><span class="line">  <span class="comment">// here since Insert() is externally synchronized.</span></span><br><span class="line">  Node* prev[kMaxHeight];</span><br><span class="line">  Node* x = <span class="built_in">FindGreaterOrEqual</span>(key, prev);</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Our data structure does not allow duplicate insertion</span></span><br><span class="line">  <span class="built_in">assert</span>(x == <span class="literal">nullptr</span> || !<span class="built_in">Equal</span>(key, x-&gt;key));</span><br><span class="line"></span><br><span class="line">  <span class="keyword">int</span> height = <span class="built_in">RandomHeight</span>();</span><br><span class="line">  <span class="keyword">if</span> (height &gt; <span class="built_in">GetMaxHeight</span>()) &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="built_in">GetMaxHeight</span>(); i &lt; height; i++) &#123;</span><br><span class="line">      prev[i] = head_;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// It is ok to mutate max_height_ without any synchronization</span></span><br><span class="line">    <span class="comment">// with concurrent readers.  A concurrent reader that observes</span></span><br><span class="line">    <span class="comment">// the new value of max_height_ will see either the old value of</span></span><br><span class="line">    <span class="comment">// new level pointers from head_ (nullptr), or a new value set in</span></span><br><span class="line">    <span class="comment">// the loop below.  In the former case the reader will</span></span><br><span class="line">    <span class="comment">// immediately drop to the next level since nullptr sorts after all</span></span><br><span class="line">    <span class="comment">// keys.  In the latter case the reader will use the new node.</span></span><br><span class="line">    max_height_.<span class="built_in">store</span>(height, std::memory_order_relaxed);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  x = <span class="built_in">NewNode</span>(key, height);</span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; height; i++) &#123;</span><br><span class="line">    <span class="comment">// NoBarrier_SetNext() suffices since we will add a barrier when</span></span><br><span class="line">    <span class="comment">// we publish a pointer to &quot;x&quot; in prev[i].</span></span><br><span class="line">    x-&gt;<span class="built_in">NoBarrier_SetNext</span>(i, prev[i]-&gt;<span class="built_in">NoBarrier_Next</span>(i));</span><br><span class="line">    prev[i]-&gt;<span class="built_in">SetNext</span>(i, x);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对比 SkipList 论文中给出的插入算法和 LevelDB 的实现，还是可以比较清晰地看明白的。首先找到插入的位置，并且通过 <em>prev</em>（伪代码中为 <em>update</em> ）记录各个级别的前驱节点。在 LevelDB 的实现中，不允许对同一个键进行两次插入，在断言中否定了这种情况，而在 SkipList 的伪代码中是允许这种情况的。找到待插入的位置后，为该节点分配一个级别，如果这个级别高于了当前跳表的级别，那么就需要对 <em>prev</em> 中高于跳表级别的指针进行处理，使其指向 <em>head_</em> 。完成好这些预备工作后，为当前键生成一个节点实例，然后将新节点的 $i$ 级指针设置为 $prev[i]$ 的 $i$ 级指针的值，而 $prev[i]$ 的 $i$ 级指针则更新为新生成的这个节点。处理好这些指针后，新的节点插入就算完成了。</p>
+<h2 id="Contains"><a href="#Contains" class="headerlink" title="Contains"></a>Contains</h2><p>最后我们来看看 <code>Contains</code> 是如何实现的：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// skiplist.h</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Key, <span class="class"><span class="keyword">class</span> <span class="title">Comparator</span>&gt;</span></span><br><span class="line"><span class="keyword">bool</span> SkipList&lt;Key, Comparator&gt;::<span class="built_in">Contains</span>(<span class="keyword">const</span> Key&amp; key) <span class="keyword">const</span> &#123;</span><br><span class="line">  Node* x = <span class="built_in">FindGreaterOrEqual</span>(key, <span class="literal">nullptr</span>);</span><br><span class="line">  <span class="keyword">if</span> (x != <span class="literal">nullptr</span> &amp;&amp; <span class="built_in">Equal</span>(key, x-&gt;key)) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个实际上就比较简单了，就是调用了搜索过程的函数，然后判断搜索到的节点的键是否等于搜索键即可。</p>
+<p>到这里，SkipList 的基本内容就讲完了。SkipList 这个数据结构实际上就是在有序链表的基础上通过增加索引形成的一个数据结构，LevelDB 中的实现基本也是按照论文中的思路进行的。建议希望深入了解 SkipList 的读者去阅读其论文原文以及相关的研究论文。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+      <div>
+        <ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者：</strong>
+    Mark Lau
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/" title="LevelDB 源代码阅读（四）：MemTable">http://thumarklau.github.io/2021/07/15/leveldb-source-code-reading-4/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>
+    本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" rel="external nofollow" target="_blank">CC BY-NC-SA 3.0</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+
+      </div>
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/07/13/SkipList/" rel="next" title="跳表：平衡树的概率替代方案">
+                <i class="fa fa-chevron-left"></i> 跳表：平衡树的概率替代方案
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image"
+                src="/images/me.jpg"
+                alt="" />
+            
+              <p class="site-author-name" itemprop="name"></p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/%7C%7Carchive">
+              
+                  <span class="site-state-item-count">16</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">16</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+
+          </nav>
+
+          
+
+          
+            <div class="links-of-author motion-element">
+                
+                  <span class="links-of-author-item">
+                    <a href="https://github.com/THUMarkLau" target="_blank" title="GitHub">
+                      
+                        <i class="fa fa-fw fa-github"></i>GitHub</a>
+                  </span>
+                
+            </div>
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#MemTable-%E5%9F%BA%E6%9C%AC%E7%BB%93%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">MemTable 基本结构</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%B7%B3%E8%A1%A8-SkipList"><span class="nav-number">2.</span> <span class="nav-text">跳表 SkipList</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#LevelDB-%E4%B8%AD%E7%9A%84%E8%B7%B3%E8%A1%A8"><span class="nav-number">3.</span> <span class="nav-text">LevelDB 中的跳表</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Search"><span class="nav-number">3.1.</span> <span class="nav-text">Search</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Insert"><span class="nav-number">3.2.</span> <span class="nav-text">Insert</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Contains"><span class="nav-number">3.3.</span> <span class="nav-text">Contains</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Liu Xuxin</span>
+
+  
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-area-chart"></i>
+    </span>
+    
+      <span class="post-meta-item-text">Site words total count&#58;</span>
+    
+    <span title="Site words total count">42026</span>
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+  
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({
+        tex2jax: {
+          inlineMath: [ ['$','$'], ["\\(","\\)"]  ],
+          processEscapes: true,
+          skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        }
+      });
+    </script>
+
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for (i=0; i < all.length; i += 1) {
+          all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+      });
+    </script>
+    <script type="text/javascript" src="//cdn.bootcss.com/mathjax/2.7.1/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+  
+
+
+  
+
+  
+
+</body>
+</html>
