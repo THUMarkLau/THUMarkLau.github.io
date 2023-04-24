@@ -1,0 +1,803 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="在现代操作系统中，使用多个进程来实现应用和系统是一种广泛使用的方法。进程间通信(Inter-Process Communication) 是多进程协作的基础。 一般来说，IPC 至少需要两个进程参与。根据信息流动的方向，这两方可以被称为发送者和接收者。在实际使用中，IPC 常被用于服务调用，因此参与 IPC 的双方又被称为调用者和被调用者，或者客户端和服务端。 为了有效地协同工作，进程间通信一般伴">
+<meta property="og:type" content="article">
+<meta property="og:title" content="操作系统（三）：进程间通信">
+<meta property="og:url" content="http://example.com/2021/03/23/OS-IPC/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="在现代操作系统中，使用多个进程来实现应用和系统是一种广泛使用的方法。进程间通信(Inter-Process Communication) 是多进程协作的基础。 一般来说，IPC 至少需要两个进程参与。根据信息流动的方向，这两方可以被称为发送者和接收者。在实际使用中，IPC 常被用于服务调用，因此参与 IPC 的双方又被称为调用者和被调用者，或者客户端和服务端。 为了有效地协同工作，进程间通信一般伴">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-03-23T07:32:58.000Z">
+<meta property="article:modified_time" content="2023-04-24T07:31:59.034Z">
+<meta property="article:author" content="MarkLau">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>操作系统（三）：进程间通信 - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"example.com","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="操作系统（三）：进程间通信"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2021-03-23 15:32" pubdate>
+          2021年3月23日 下午
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          9.2k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          77 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">操作系统（三）：进程间通信</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>在现代操作系统中，使用多个进程来实现应用和系统是一种广泛使用的方法。<strong>进程间通信(Inter-Process Communication)</strong> 是多进程协作的基础。</p>
+<p>一般来说，IPC 至少需要两个进程参与。根据信息流动的方向，这两方可以被称为<strong>发送者</strong>和<strong>接收者</strong>。在实际使用中，IPC 常被用于服务调用，因此参与 IPC 的双方又被称为<strong>调用者</strong>和<strong>被调用者</strong>，或者<strong>客户端</strong>和<strong>服务端</strong>。</p>
+<p>为了有效地协同工作，进程间通信一般伴随着数据的传输。一种常用的通信数据的抽象是**消息(message)<strong>。消息一般包含一个</strong>头部(header)<strong>和一个</strong>数据段(payload)**。头部中通常含有魔数、消息长度、校验码等信息，而数据段中则既可以包含“纯”数据，也可以包含系统资源（如文件描述符等）。</p>
+<p>下面，本文将简略地介绍 IPC 的相关内容。</p>
+<h1 id="一个简单的-IPC-设计"><a href="#一个简单的-IPC-设计" class="headerlink" title="一个简单的 IPC 设计"></a>一个简单的 IPC 设计</h1><p>考虑一个简单的 IPC，内核将两个进程的一段虚拟地址映射到同一段物理地址上，即两个进程之间有一段共享内存。在通信时，发送者将要传输的数据内容拷贝到<strong>发送者消息</strong>上，然后依次设置头部中的状态（设置为“准备就绪”）等信息。接收者会不停地轮询发送者消息的状态，一旦观测到状态信息为“准备就绪”，就表示发送者发出了一个消息。发送者一发送完消息，就开始轮询<strong>接收者消息</strong>的状态，等待其变成“准备就绪”。接收者在读取到发送者的消息后，处理请求，并在接收者消息上准备返回结果。当发送者观测到接收者消息的状态为“准备就绪”后，即表示收到了返回的结果。</p>
+<p>这样，我们就利用共享内存+轮询完成了一个简单的 IPC。但是这个 IPC 有许多缺点，例如：轮询时会浪费 CPU 资源、多个线程进行通信时共享内存较为不方便等。</p>
+<h1 id="IPC-基础"><a href="#IPC-基础" class="headerlink" title="IPC 基础"></a>IPC 基础</h1><h2 id="数据传递"><a href="#数据传递" class="headerlink" title="数据传递"></a>数据传递</h2><p>从以上简单的 IPC 方案可以看出，IPC 的一个重要功能是在进程间传递数据。消息传递(message passing)是 IPC 中常用的数据传递方式：将数据抽象成一个个的消息进行传递。消息传递往往需要一个“中间人”（如共享内存、内核等）。消息传递的基本接口有以下四个：</p>
+<figure class="highlight reasonml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs reasonml">发送消息：<span class="hljs-constructor">Send(<span class="hljs-params">message</span>)</span><br>接收消息：<span class="hljs-constructor">Recv(<span class="hljs-params">message</span>)</span><br>远程过程调用：<span class="hljs-constructor">RPC(<span class="hljs-params">req_message</span>, <span class="hljs-params">recv_message</span>)</span><br>回复消息：<span class="hljs-constructor">Reply(<span class="hljs-params">resp_message</span>)</span><br></code></pre></td></tr></table></figure>
+<p>发送消息和接收消息的语义比较直接，远程过程调用（Remote Procedure Call，RPC）可以理解为发送端调用 <code>Send</code> 接口后紧接着调用 <code>Recv</code> 接口。<code>Reply</code> 通常用于回复一个远程过程调用。</p>
+<h3 id="基于共享内存的消息传递"><a href="#基于共享内存的消息传递" class="headerlink" title="基于共享内存的消息传递"></a>基于共享内存的消息传递</h3><p>在前面简单的 IPC 方案中，我们已经看到了进程是如何使用共享内存来进行通信的。这种方式的一个特点是：操作系统在通信过程中不干预数据传输。从操作系统的角度看，共享内存为两个（或多个）进程在其虚拟地址空间中映射了同一段物理内存，这些方案里操作系统通常不参与后续的通信过程。</p>
+<h3 id="操作系统辅助的消息传递"><a href="#操作系统辅助的消息传递" class="headerlink" title="操作系统辅助的消息传递"></a>操作系统辅助的消息传递</h3><p>操作系统辅助的消息传递指内核对用户态提供通信的接口，如 <code>Send</code> 或 <code>Recv</code> 等。进程可以直接使用这些接口，将消息传递给另一个进程，而不需要建立共享内存和执行轮询内存数据等操作。</p>
+<p>当两个进程 $P$ 和 $Q$ 通过内核接口进行 IPC 时，其需要</p>
+<ol>
+<li>通过特定的内核接口建立一个通信连接。这里的建立通信链接更多的是一个抽象的建立过程，具体的形式由内核决定，如内核可以通过维护一个数据结构来记录建立好连接的进程对。</li>
+<li>通过 <code>Send</code> 和 <code>Recv</code> 接口传递消息。</li>
+</ol>
+<h3 id="共享内存和操作系统辅助传递的对比"><a href="#共享内存和操作系统辅助传递的对比" class="headerlink" title="共享内存和操作系统辅助传递的对比"></a>共享内存和操作系统辅助传递的对比</h3><p>从性能的角度来看，共享内存在传递消息时可以实现理论上的零内存拷贝传输。这里的内存拷贝，指的是将数据从内存的一片区域拷贝到内存中的另一片区域。而在操作系统辅助传递方式中，通常需要将数据从发送者的用户态内存拷贝到内核内存，然后将数据从内核内存拷贝到接收者的用户态内存，这个过程包含两次拷贝。</p>
+<p>当然，操作系统辅助传递也有优点。第一，操作系统辅助传递的抽象更简单，内核可以保证每一次通信接口的调用都是一个消息被发送或接收，并且可以很好地支持变长消息，而共享内存则需要用户态软件来封装实现这一功能。第二，操作系统辅助传递的安全性更强，可以保证进程之间的隔离性。第三，在多方通信时，在多个进程之间共享内存是不安全的，而操作系统辅助传递则没有这个问题。</p>
+<h2 id="控制流转移"><a href="#控制流转移" class="headerlink" title="控制流转移"></a>控制流转移</h2><p>对内核来说，实现消息传递机制除了要考虑数据的传输，往往还要附带<strong>控制流转移</strong>的功能：当一个通信发生时，内核将控制流从发送者进程切换到接收者进程（返回时类似）。在共享内存的方案中，如果没有控制流转移的功能，只能通过不断地轮询来检查是否有消息到来，而这可能会浪费大量 CPU 资源。</p>
+<p>一个常见的流程如下：<br>首先，接收者进程完成初始化后将自己阻塞起来等待消息的到来（如执行阻塞的 <code>Recv</code>）。<br>之后，发送者进程发起通信（RPC）。在处理该操作时，内核首先将发送者的消息传递给接收者，然后令发送者进程进入阻塞状态，并将接收者进程从阻塞状态唤醒为预备状态。对接收者进程而言，会从阻塞的 <code>Recv</code> 函数中返回一个消息，表明收到了发送者的一个消息。<br>接收者完成处理，发送消息，然后自己进入阻塞状态。内核将数据传送到发送者进程，并将其唤醒。</p>
+<p>结合内核中的调度以及对进程的调度状态的修改，控制流转移可以避免轮询操作，从而将消息高效地进行传递。</p>
+<h2 id="单向通信与双向通信"><a href="#单向通信与双向通信" class="headerlink" title="单向通信与双向通信"></a>单向通信与双向通信</h2><p>IPC 通常包含三种可能的方向：仅支持单向通信、仅支持双向通信、单向和双向通信均可。</p>
+<p>通常来说，单向通信其实是系统软件实现 IPC 的一个基本单元，双向通信时可以基于单向 IPC 来搭建的。在接口上，如果通信建立后，通信的双方分别只能使用 <code>Send</code> 和 <code>Recv</code> 接口，那么这通常对应于单向通信。实际中，很多系统选择的是单向和双向皆可的策略，这样可以比较好地支持各种场景。当然，如管道、信号等只支持单向通信的机制在实际中同样有较多应用。</p>
+<h2 id="同步与异步-IPC"><a href="#同步与异步-IPC" class="headerlink" title="同步与异步 IPC"></a>同步与异步 IPC</h2><p>IPC 的另一种分类是：同步 IPC 和异步 IPC。简单来说，同步 IPC 在操作时会阻塞进程直到该操作完成；而异步 IPC 则通常是非阻塞的，进程只需要发起一次操作即可返回，而不需要等待其完成。异步 IPC 通常通过轮询内存状态或注册回调函数（如果内核支持）来获取返回结果。</p>
+<p>同步 IPC 往往是双向 IPC（或 RPC），即发送者需要等待返回的结果。不过也存在单向 IPC 是同步的，这种情况下发送者虽然不会等待接收者返回结果，但是其会等待接收者接收消息。</p>
+<p>在早期的微内核系统中，同步 IPC 往往是唯一的 IPC 方式。这是因为相比异步 IPC，同步 IPC 有更好的编程抽象。例如使用同步 RPC 时，调用者可以将进程间通信看作是一种函数调用，调用返回时也意味着结果返回了。但是同步 IPC 在操作系统发展的过程中，逐渐表现出一些不足。一个典型的问题是并发。当一个服务进程要响应很多客户进程的通信时，在同步 IPC 的实现下为了服务进程往往需要创建大量工作线程去响应不同的客户进程，否则可能出现客户进程阻塞的现象。但是这里也有一个问题，过多的工作线程会浪费系统资源。而使用异步 IPC 则可以在并发通信时避免这些问题。总的来看，目前大部分操作系统都会选择同时实现同步和异步的 IPC，以满足不同的应用需求。</p>
+<h2 id="超时机制"><a href="#超时机制" class="headerlink" title="超时机制"></a>超时机制</h2><p>由于进程间有隔离性，因此有一个问题时：通信的双方很难确认对方的状态。例如在同步 IPC 中，当控制流从调用者传递到被调用者后，如果被调用者恶意地不返回到调用者，那么就会使得调用者无法继续执行。异步 IPC 也有类似的问题。即使控制流不会被被调用者恶意地抢占，调用者仍然有可能花费很长时间等待一个请求的处理，例如当被调用者十分忙碌时。</p>
+<p>为了解决这个问题，IPC 的设计中引入了<strong>超时机制</strong>。超时机制扩展了 IPC 通信双方的接口，允许发送者&#x2F;接收者指定它们发送&#x2F;接收请求的等待时间。例如，一个用户进程可以花费 5 秒等待文件系统进程的 IPC 请求处理操作。如果超过这个时间仍没有反馈，则由操作系统内核结束这次 IPC 调用，返回一个超时错误。超时机制允许进程为一次通信的等待时间设置一个上限，从而避免类似<strong>拒绝服务</strong>的攻击情况出现。</p>
+<p>但是在实际中，大部分进程难以决定一个合理的超时。例如前面等待文件系统进程的 5 秒，当处理的数据量非常大时，5 秒可能不够文件系统进程处理请求。一个过短的超时显然不行，但是一个过长的超时又容易使得调用者无法察觉被调用者的异常。因此，内核常引入两个特殊的超时选择：“永不返回”和“立即返回”。“永不返回”和引入超时机制之前的状态类似；而“立即返回”则是说只有当前被调用者处于可以立即响应的状态才会真的发起通信，否则就直接返回。更注重安全性时应该选择“立即返回”，更注重功能性时则应选择“永不返回”，这由发送者决定。</p>
+<h2 id="直接通信与间接通信"><a href="#直接通信与间接通信" class="headerlink" title="直接通信与间接通信"></a>直接通信与间接通信</h2><p>在建立一个连接时，虽然不同的系统有不同的实现，但是通常可以分成两类：<strong>直接通信</strong>和<strong>间接通信</strong>。在直接通信中，通信的进程一方需要显式地标识另一方。例如，<code>Send(P,message)</code> 代表向 $P$ 进程发送一则消息；<code>Recv(Q, message)</code> 代表从 $Q$ 进程接收一则消息。直接通信下连接的建立是自动的，在具体交互时通过标识的名称完成。这就意味着，一个连接会唯一地对应一对进程。连接本身可以是单向的，也可以是双向的。</p>
+<p>在间接通信中，消息传递通过一个中间的信箱来完成。每个信箱有其唯一的标识符，而进程间通过同一个信箱来交换消息。也就是说，进程间连接的建立发生在共享一个信箱时。而每对进程可以通过共享多个信箱来建立多个连接。连接同样可以时单向的或双向的。</p>
+<h2 id="权限检查"><a href="#权限检查" class="headerlink" title="权限检查"></a>权限检查</h2><p>进程间的通信通常依赖于一套权限检查的机制来保证连接的安全性。在如 Linux 这样的宏内核系统中，通常将安全检查机制和文件的权限检查机制结合在一起。一个进程和其他进程通信，必须要通过权限的检查。例如，seL4 等微内核系统中的 Capability 机制，会将所有的通信连接抽象成一个个的内核对象。而每个进程对内核对象的访问权限由 Capability 来刻画。在宏内核系统中，如 Linux 中，通常会复用其有效用户&#x2F;有效组的文件权限，以刻画进程对某个连接的权限。</p>
+<h2 id="命名服务"><a href="#命名服务" class="headerlink" title="命名服务"></a>命名服务</h2><p>权限检查机制带来了安全性，但是权限如何分发呢？通常，权限的分发会通过一个用户态的服务——**命名服务(naming server)**来处理。命名服务进程则指代提供该服务的具体进程。</p>
+<p>命名服务就像一个全局看板，可以协调服务端进程和客户端进程之间的通信。简单来说，服务端进程可以将自己提供的服务告诉命名服务进程，例如文件系统进程可以注册一个“文件系统服务”。客户端进程可以去命名服务上查询当前服务，并选择自己希望建立连接的服务去尝试获取权限。具体是否分发权限给对应的客户端进程，是由命名服务和对应的服务端进程根据特定的策略来判断的，例如文件系统进程可能允许任意线程进行连接，一个数据库进程则可能需要客户端提供私钥签名的证书。使用命名服务有很多的好处，比如各个服务不再是内核中的 ID 等抽象的表示，而是对应用更加友好的“名字”。</p>
+<h1 id="宏内核系统中的-IPC"><a href="#宏内核系统中的-IPC" class="headerlink" title="宏内核系统中的 IPC"></a>宏内核系统中的 IPC</h1><p>一般来说，宏内核系统中 IPC 的方式主要有：管道、消息队列、信号量、共享内存、信号、套接字。</p>
+<h2 id="管道"><a href="#管道" class="headerlink" title="管道"></a>管道</h2><p><strong>管道（pipe）</strong>是宏内核场景下重要的进程间通信机制。正如其名，管道是两个进程间的一条通道，一端负责投递，一端负责接收。例如，我们执行 Linux 下的 shell 命令</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs shell">ps aux | grep target<br></code></pre></td></tr></table></figure>
+<p>来查看是否含有关键字为 target 的进程在运行。这里其实有两个命令：ps 和 grep，通过 shell 的管道接口 |，将第一个命令的输出投递到一个管道中，而这条管道的出口则是第二个命令的输入。</p>
+<p>管道是单向的 IPC，内核中通常有一定的缓冲区来缓冲消息，而通信的数据（消息抽象）是字节流，需要应用自己去对数据进行解析。</p>
+<p>具体实现上，管道在 UNIX 系列的系统中会被当作一个文件。内核会为用户态提供代表管道的文件描述符，让其可以通过文件系统相关的系统调用来使用。管道的行为和 FIFO 队列非常像，最早传入的数据会被最先读出来。</p>
+<p>当一个进程尝试在输出端对一个空管道进行读取时，会有两种情况：如果系统发现还没有任何进程有这个管道的写端口，就会得到 EOF（End-of-File）；否则，进程会阻塞在这个系统调用上，直到数据到来。第一种情况发生的可能是，管道的两个端口在 UNIX 系列系统的内核中以两个独立的文件描述符存在的，写端口有可能被进程给主动关闭了。对于第二种情况，进程可以通过配置非阻塞来避免阻塞。</p>
+<h3 id="命名管道和匿名管道"><a href="#命名管道和匿名管道" class="headerlink" title="命名管道和匿名管道"></a>命名管道和匿名管道</h3><p>在经典的 UNIX 实现中，管道有两类：命名管道和匿名管道。主要区别在于它们的创建方式。匿名管道通过 <code>pipe</code> 的系统调用创建，在创建的同时进程会拿到读写的端口（两个文件描述符）。由于整个管道没有全局的“名字”，因此只能通过这两个文件描述符来使用它。这种情况下，通常结合 <code>fork</code> 的使用，即继承的方式来建立父子进程间的连接。例如，父进程创建好了一个管道，然后使用 <code>fork</code> 创建子进程。子进程会有用父进程的系统资源，也就有了该管道的读写端口，因此可以和父进程通过该管道进行通信。这种方式对于父子进程等有着创建关系的进程间通信比较方便，但是对于两个关系较远的进程就不太适用。</p>
+<p>命名管道通过 <code>mkfifo</code> 来创建，在创建时会指定一个全局的文件名，由这个文件名（例如 &#x2F;tmp&#x2F;namedpipe）来指代一个具体的管道。通过这种方式，只要两个进程通过一个相同的管道名进行创建（并且都拥有权限），就可以实现在任意两个进程间建立管道的通信连接。</p>
+<h2 id="System-V-消息队列"><a href="#System-V-消息队列" class="headerlink" title="System V 消息队列"></a>System V 消息队列</h2><p>相比于本文介绍的其他宏内核通信机制，  消息队列是唯一一个以消息为数据抽象的通信机制。应用可以通过消息队列来发送或接收消息，发送和接收的接口是由内核提供的。消息队列是一种非常灵活的通信方式，可以有多个发送者和多个接收者。并且在 Linux 中，消息队列中的每个消息都有其类型抽象，使得发送者和接受者可以根据消息的类型来选择性地处理消息。</p>
+<h3 id="消息队列的结构"><a href="#消息队列的结构" class="headerlink" title="消息队列的结构"></a>消息队列的结构</h3><p>消息队列在 Linux 内核中的实现形式是消息链表。当创建新的消息队列时，操作系统将在内核中新建一个消息链表，作为消息队列的内核对象。队列的消息有一个消息头部指针，即链表中的头结点，它指向队列中的第一个消息（或者为空）。每个消息都会有指向下一个消息的指针（或者为空）。</p>
+<p>在消息结构体中，除了指针外，就是消息的内容。消息的内容有两个部分：类型和数据。数据是一段内存数据，和管道中的字节流类似。类型是用户态程序为每个消息指定的。在消息队列的设计中，内核不需要知道类型的语义，仅仅是保存，以及基于类型进行简单的查找。</p>
+<h3 id="消息队列的基本操作"><a href="#消息队列的基本操作" class="headerlink" title="消息队列的基本操作"></a>消息队列的基本操作</h3><p>消息队列一般有四个基本操作：<code>msgget</code>、<code>msgsnd</code>、<code>msgrcv</code>、<code>msgctl</code>，这四个操作在 Linux 上被实现为系统调用。</p>
+<p><code>msgget</code> 允许进程获取已有的消息队列的连接，或者创建一个新的消息队列。只要有对应的权限，消息队列允许任意数量的进程连接到同一通信连接上（即同一队列上）。<br><code>msgctl</code> 可以控制和管理一个消息队列，如修改消息队列的权限信息或删除消息队列。<br><code>msgsnd</code> 可以往消息队列上发送消息，<code>msgrcv</code> 可以从消息队列上接收消息。多个进程可以同时往消息队列上发送和从消息队列上接收消息。大部分情况下这两个过程是非阻塞的：对发送者来说，只要队列有空闲的空间就可以向其发送消息；对接收者来说，只要队列中有未读消息就可以从队列中读取消息。如果发送消息时队列中没有空间或者读取消息时队列中没有消息可以读，默认的操作是阻塞进程，直到有空间腾出或者有新的消息到达。</p>
+<h3 id="Linux-中的消息队列"><a href="#Linux-中的消息队列" class="headerlink" title="Linux 中的消息队列"></a>Linux 中的消息队列</h3><p>在 Linux 中，一个消息队列如果被创建，除非显式地将其删除，否则其生命周期是和内核一致的。其次，消息队列的内存空间是有限制的，因此消息队列并不适合传递长消息，一般建议用共享内存来传递长消息。最后，消息在用户态和内核态之间传递，会有内存拷贝的开销。</p>
+<h2 id="System-V-信号量"><a href="#System-V-信号量" class="headerlink" title="System V 信号量"></a>System V 信号量</h2><p>和其他 IPC 机制传递数据的方案不同，信号量在实际的使用中主要是用作进程间的“同步”。有些场景下，多个进程需要依赖于进程间通信来同步彼此的状态，如执行的顺序等。信号量本身能传递的数据量很少，一般来说仅有一个共享的整形计数器，该计数器通常由内核维护，而对信号量的操作则需要经过内核系统调用。</p>
+<p>信号量的主要操作有两个原语：P 和 V。P 是荷兰语 Probeer（尝试）的缩写，表示尝试一个操作（在信号量中通常是将一个计数器减 1），该操作的失败会将该进程切换到阻塞状态，直到其他进程执行了 V 操作。<br>V 是荷兰语 Verhoog（增加）的缩写，在信号量中是将一个计数器加 1。V 可能会唤醒一个因 P 操作而陷入阻塞的进程。P 和 V 的操作都是在信号量结构上进行的，该结构会封装一个计数器。</p>
+<p>信号量的一个简单的使用是将其值的范围限定在 0 到 1 之间。但执行 P 原语时，会将计数器减 1；当执行 V 原语时，会将计数器加 1。如果计数器被 P 原语减为负数，则会阻塞该进程，直到其他进程使用 V 原语将计数器修改成非负数时，则会唤醒该进程。</p>
+<p>信号量一种用途是同步进程之间的操作。例如将一个信号量限定在 0 到 1 之间，初始值为 0。进程 A 在执行之前调用 P 原语，此时信号量的计数器减去 1，变成 -1，进程 A 被阻塞。进程 B 在执行结束后使用 V 原语，将信号量的计数器增加为 0，此时进程 A 被唤醒。这样，我们就使用一个信号量，保证进程 A 和 B 的执行顺序为先 B 后 A。</p>
+<p>信号量的另一种典型用途是控制共享资源的访问，此时 P 原语和 V 原语必须成对出现，在获取资源时调用 P 原语，在释放资源时调用 V 原语。例如，某个资源对应的信号量范围在 0 到 1 之间，初始值为 1。进程 A 先访问该资源，调用 P 原语，将信号量的计数器修改为 0，成功获取资源并执行。进程 B 随后访问该资源，调用 P 原语，信号量的计数器修改为 -1，此时进程 B 被阻塞。过后一段时间，进程 A 释放资源，调用 V 原语，将进程 B 唤醒，进程 B 此时获取了资源并开始执行。进程 B 执行完成后，调用 V 原语释放资源，此时信号量的计数器恢复为 1。</p>
+<h2 id="System-V-共享内存"><a href="#System-V-共享内存" class="headerlink" title="System V 共享内存"></a>System V 共享内存</h2><p>对于消息队列、管道、信号量等机制，内核都提供了完整的接口。虽然这些完善的抽象方便了用户进程的使用，但是其中涉及的数据拷贝和控制流转移等处理逻辑影响了这些抽象的性能。共享内存将两个（或多个）进程中的一片虚拟地址空间映射到同一片物理地址空间上，当映射建立完成后，内核就不再参与进程间的通信。这样，在通信时就不存在将数据从用户态内存拷贝到内核态内存的过程，也就增强了 IPC 的性能。因此，共享内存适用于需要传递长消息的场景。</p>
+<h2 id="信号"><a href="#信号" class="headerlink" title="信号"></a>信号</h2><p>管道、消息队列、共享内存等方式主要关注数据传输的设计，而<strong>信号(signal)<strong>的一个特点是</strong>单向的事件通知</strong>。信号量也有通知能力，但是需要进程主动查询计数器或者陷入阻塞状态等待通知。使用信号，一个进程可以随时发送一个事件到特定的进程、线程或进程组等。接收事件的进程不需要阻塞等待该事件，内核会帮助其切换到对应的处理函数中响应信号事件，并且在处理完成后恢复之前的上下文。</p>
+<p>信号传递的信息很短，只有一个编号（信号类型）。例如我们在 Shell 中使用 Ctrl + C 中止一个运行中的进程，就是 Shell 发出了一个 <code>SIGINT</code> 信号，使得进程中止。</p>
+<p>在通信的场景下，一个进程会为一些特定的信号注册处理函数。当进程接收到对应的信号时，内核会自动地将用户的控制流切换到对应的处理函数中。</p>
+<p>在 Linux 中，其早期有 31 个信号（1 ~ 31 号），后续 POSIX 标准又引入了编号从 32 到 64 的其他信号。Linux 传统信号被称为常规信号，POSIX 引入的信号称为实时信号。一个进程如果多次收到某个常规信号，内核只会记录一次，而多个相同的实时信号则不会被丢弃。</p>
+<h3 id="发送信号"><a href="#发送信号" class="headerlink" title="发送信号"></a>发送信号</h3><p>信号的发送者可以是用户态进程，也可以是内核。一个用户态进程可以通过调用内核提供的系统接口，如</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs c">kill(<span class="hljs-type">pid_t</span> pid, <span class="hljs-type">int</span> sig)<br>tgkill(<span class="hljs-type">int</span> tgid, <span class="hljs-type">int</span> tid, <span class="hljs-type">int</span> sig)<br></code></pre></td></tr></table></figure>
+<p>向进程或线程发送特定的信号。内核通过不同的系统调用及其参数，来确定接收信号的目标进程或线程，将信号事件添加到其等待队列上。添加操作需要区别实时信号和常规信号，当发送的信号是非实时的信号，并且现在还未处理该信号时，内核会忽略掉这个事件。</p>
+<h3 id="处理信号"><a href="#处理信号" class="headerlink" title="处理信号"></a>处理信号</h3><p>Linux 提供了一个 <code>sigprocmask</code> 系统调用，允许用户设置队特定信号的阻塞状态。当一个信号被阻塞后，Linux 将不会再触发这个信号的响应函数，直到该信号被解除阻塞。信号被阻塞并不会影响其被添加到等待队列上，当进程解除了对这个信号的阻塞时，其可能需要处理在阻塞期间收到的信号。很多重要的信号是不能被阻塞的，例如 SIGKILL。</p>
+<p>在 Linux 等 UNIX 系统的设计中，信号得到处理的时机通常是内核执行完异常、中断或系统调用等返回到用户态的时刻，此时内核会检查一个状态位来判断是否有信号需要处理。如果有，则先去处理该信号事件。Linux 提供了 <code>signal</code>、<code>sigaction</code> 等系统调用，允许用户为特定的信号注册一个用户态响应函数。</p>
+<h3 id="可重入处理函数"><a href="#可重入处理函数" class="headerlink" title="可重入处理函数"></a>可重入处理函数</h3><p>在信号处理函数执行的过程中，如果其他进程又发送了一个该信号事件过来，并且当前进程由于中断等下陷到内核，那么当前进程可能会暂停当前信号处理函数的执行，并且重新切换到处理函数的开头去处理新的信号事件，然后再回到原来的地方继续执行原本的信号响应函数。这种嵌套需要信号处理函数是<strong>可重入</strong>的。简单来说，就是在信号处理的过程中，有可能会产生并发，并且调用的函数就是信号处理函数本身。假如此时在信号处理函数中使用了全局锁保护一段关键操作时，就有可能导致死锁：信号处理函数在第一次被调用时获得了全局锁，在进行到一半时又被从头执行，此时原本的信号处理函数没有释放获得的锁，因而新的处理函数无法获取全局锁，进而造成死锁的局面。</p>
+<p><strong>可重入（reentrant）</strong>函数允许多个任务并发使用，而不用担心共享数据的错误。一般来说，实现一个可重入函数有以下几个要求：</p>
+<ul>
+<li>不使用静态数据，或者静态数据都是只读的。</li>
+<li>尽量只使用本地数据。</li>
+<li>在必须使用全局共享数据的情况下，需要保护对全局数据的访问（也需要避免死锁）。</li>
+<li>避免在函数中修改自己的代码。</li>
+<li>不调用不可重入的函数，很多库函数的实现（例如 <code>malloc</code>）是不可重入的，需要注意。</li>
+</ul>
+<h2 id="Socket"><a href="#Socket" class="headerlink" title="Socket"></a>Socket</h2><p>**套接字(Socket)**是一种既可用于本地，又可跨网络使用的通信机制。因此应用程序可以使用 Socket 来实现本地进程间的通信和跨机器的通信。在进行本地通信时，通信双方通常使用本地回环地址（127.0.0.1），然后各自绑定在不同的端口上。操作系统网络协议栈会识别回环地址，将通信消息转发到目标端口对应的进程。此外，也可以用本地文件系统的一个路径作为地址，这通常被叫做 UNIX domain socket。使用套接字通常有两种协议，TCP 和 UDP。TCP 传输可以保证数据的正确性，UDP 则在传输性能上更佳。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a target="_blank" rel="noopener" href="https://book.douban.com/subject/35208251/">《现代操作系统：原理与实现》</a>，陈海波，夏虞斌等著，机械工业出版社</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" class="category-chain-item">计算机科学</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" class="category-chain-item">操作系统</a>
+  
+  
+
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>操作系统（三）：进程间通信</div>
+      <div>http://example.com/2021/03/23/OS-IPC/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2021年3月23日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/07/08/leveldb-source-code-reading-1/" title="LevelDB 源代码阅读（一）：写流程">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">LevelDB 源代码阅读（一）：写流程</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/03/12/OS-process-and-thread/" title="操作系统（二）：进程与线程">
+                        <span class="hidden-mobile">操作系统（二）：进程与线程</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

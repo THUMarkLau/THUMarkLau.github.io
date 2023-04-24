@@ -1,0 +1,805 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="LevelDB 是一款基于 LSM 树的嵌入式高性能 NoSQL 数据库，由 Google 的两位 Fellow （Jeff Dean 和 Sanjay Ghemawat）设计开发。LevelDB 最初使用 C++ 开发，后面衍生出了不同语言版本，如 Go-LevelDB、 Java-LevelDB 等。本系列文章基于最新 C++ 版 LevelDB（1.23.0，截止 2021.7.8），对其结">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB 源代码阅读（一）：写流程">
+<meta property="og:url" content="http://example.com/2021/07/08/leveldb-source-code-reading-1/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="LevelDB 是一款基于 LSM 树的嵌入式高性能 NoSQL 数据库，由 Google 的两位 Fellow （Jeff Dean 和 Sanjay Ghemawat）设计开发。LevelDB 最初使用 C++ 开发，后面衍生出了不同语言版本，如 Go-LevelDB、 Java-LevelDB 等。本系列文章基于最新 C++ 版 LevelDB（1.23.0，截止 2021.7.8），对其结">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/2021/07/08/leveldb-source-code-reading-1/LSM.png">
+<meta property="og:image" content="http://example.com/2021/07/08/leveldb-source-code-reading-1/Leveldb-operation_encode.png">
+<meta property="og:image" content="http://example.com/2021/07/08/leveldb-source-code-reading-1/Leveldb-write_batch.png">
+<meta property="og:image" content="http://example.com/2021/07/08/leveldb-source-code-reading-1/Leveldb-internal_key.png">
+<meta property="article:published_time" content="2021-07-08T02:17:32.000Z">
+<meta property="article:modified_time" content="2023-04-24T08:53:41.218Z">
+<meta property="article:author" content="MarkLau">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="http://example.com/2021/07/08/leveldb-source-code-reading-1/LSM.png">
+  
+  
+  
+  <title>LevelDB 源代码阅读（一）：写流程 - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"example.com","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="LevelDB 源代码阅读（一）：写流程"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2021-07-08 10:17" pubdate>
+          2021年7月8日 上午
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          11k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          88 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">LevelDB 源代码阅读（一）：写流程</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>LevelDB 是一款基于 LSM 树的嵌入式高性能 NoSQL 数据库，由 Google 的两位 Fellow （Jeff Dean 和 Sanjay Ghemawat）设计开发。LevelDB 最初使用 <a target="_blank" rel="noopener" href="https://github.com/google/leveldb">C++</a> 开发，后面衍生出了不同语言版本，如 <a target="_blank" rel="noopener" href="https://github.com/golang/leveldb">Go-LevelDB</a>、 <a target="_blank" rel="noopener" href="https://github.com/dain/leveldb">Java-LevelDB</a> 等。本系列文章基于最新 C++ 版 LevelDB（1.23.0，截止 2021.7.8），对其结构设计进行分析，相关代码存放在<a target="_blank" rel="noopener" href="https://github.com/THUMarkLau/leveldb">我的 github 仓库</a>。</p>
+<h1 id="LSM-树结构"><a href="#LSM-树结构" class="headerlink" title="LSM 树结构"></a>LSM 树结构</h1><p>LSM 树的英文全称为 <strong>Log-Structured-Merge-Tree</strong>，翻译过来就是结构日志合并树。但是 LSM 树并不是一种严格意义上的树型数据结构，而是一种数据存储机制。这种树的机制大致如图</p>
+<img src="LSM.png" srcset="/img/loading.gif" lazyload>
+
+<p>当一个数据写入时，首先记录预写日志，然后将数据插入到内存中一个名为 <strong>MemTable</strong> 的数据结构中。当 MemTable 的大小到达阈值后，就会转换为 Immutable MemTable 。MemTable 和 Immutable MemTable 的内容大致相同，但是 Immutable MemTable 无法再发生写入。因此，在 MemTable 转换为 Immutable MemTable 的同时，也会开启一个新的 MemTable 供新数据写入。</p>
+<p>Immutable MemTable 则在后台线程中经过压缩等程序后，被写入磁盘中，成为 SSTable 。一个 SSTable 往往就是一个数据文件。SSTable 是无法被修改的，但是有时用户会写入覆盖前面数据的新数据，例如在 KV 数据库中对一个原有的 Key 赋予一个新的值。所以，新老 SSTable 之间可能存在数据重叠。同时，因为 MemTable 的大小容易受到物理内存大小的限制，一般不会太大。因此，从数据库中直接 dump 出来的 SSTable 一般比较小，数目也比较多。过多的数据文件数量会导致数据库的查询性能下降，因此在文件落盘后，数据库还会对文件进行<strong>合并（Compaction）</strong>。合并即将小的 SSTable 合并为大的 SSTable，并且在合并的过程中还可能会进行数据去重、布局优化等操作。</p>
+<p>LevelDB 中的 Level，代表的就是其后台使用的合并策略。如图所示，在 LevelDB 中，数据文件（即 SSTable）按照层级进行管理。从数据库中直接 dump 出的数据文件为第 0 层，多个 0 层文件进行合并以后得到了 1 层文件，多个 1 层文件合并后得到 2 层文件，以此类推。多个第 N - 1 层文件进行合并会得到一个第 N 层文件，文件所在的层数也代表了其中的数据被合并的次数。同时，随着文件层数的增加，文件的大小也一般会变得越来越大。</p>
+<p>当然，合并的策略不止 Level Compaction 这一种，学术界提出了许多种合并策略，感兴趣的读者可以自行搜索阅读，本文就不再深入。</p>
+<h1 id="LevelDB-写入流程"><a href="#LevelDB-写入流程" class="headerlink" title="LevelDB 写入流程"></a>LevelDB 写入流程</h1><p>LevelDB 没有设计成 C&#x2F;S 模式，而是将数据库以库文件的形式提供给用户，运行时数据库需要和服务一起部署在同一台服务器上。我们简单地用下面这一段代码来说明 LevelDB 的写入过程：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">//</span><br><span class="hljs-comment">// Created by lau on 2021/6/17.</span><br><span class="hljs-comment">//</span><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cassert&gt;</span></span><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;leveldb/db.h&gt;</span></span><br><br><span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> std;<br><span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> leveldb;<br><br><span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span><br><span class="hljs-function"></span>&#123;<br>  DB *db;<br>  Options options;<br>  options.create_if_missing = <span class="hljs-literal">true</span>;<br>  Status status = DB::<span class="hljs-built_in">Open</span>(options, <span class="hljs-string">&quot;./dbtest&quot;</span>, &amp;db);<br>  <span class="hljs-built_in">assert</span>(status.<span class="hljs-built_in">ok</span>());<br>  std::string value;<br>  std::string key1 = <span class="hljs-string">&quot;testkey1&quot;</span>;<br>  leveldb::Status s = db-&gt;<span class="hljs-built_in">Get</span>(leveldb::<span class="hljs-built_in">ReadOptions</span>(), key1, &amp;value);<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">IsNotFound</span>()) &#123;<br>    std::cout &lt;&lt; <span class="hljs-string">&quot;can not found for key:&quot;</span> &lt;&lt; key1 &lt;&lt; std::endl;<br>    db-&gt;<span class="hljs-built_in">Put</span>(leveldb::<span class="hljs-built_in">WriteOptions</span>(), key1, <span class="hljs-string">&quot;testvalue1&quot;</span>);<br>  &#125;<br>  s = db-&gt;<span class="hljs-built_in">Get</span>(leveldb::<span class="hljs-built_in">ReadOptions</span>(), key1, &amp;value);<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    std::cout &lt;&lt; <span class="hljs-string">&quot;found key:&quot;</span> &lt;&lt; key1 &lt;&lt; <span class="hljs-string">&quot;,value:&quot;</span> &lt;&lt; value &lt;&lt; std::endl;<br>  &#125;<br>  s = db-&gt;<span class="hljs-built_in">Delete</span>(leveldb::<span class="hljs-built_in">WriteOptions</span>(), key1);<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    std::cout &lt;&lt; <span class="hljs-string">&quot;delete key success which key:&quot;</span> &lt;&lt; key1 &lt;&lt; std::endl;<br>  &#125;<br>  s = db-&gt;<span class="hljs-built_in">Get</span>(leveldb::<span class="hljs-built_in">ReadOptions</span>(), key1, &amp;value);<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">IsNotFound</span>()) &#123;<br>    std::cout &lt;&lt; <span class="hljs-string">&quot;can not found after delete for key:&quot;</span> &lt;&lt; key1 &lt;&lt; std::endl;<br>  &#125;<br><br>  <span class="hljs-keyword">delete</span> db;<br><br>  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>代码的第 13 行到 17 行启动了一个 LevelDB 实例，第 18 到 20 行试图从 LevelDB 中获取键 <em>testkey1</em> 所对应的值。当获取失败后，第 23 行则会向数据库中插入键 <code>testkey1</code> 及其对应的值 <em>testvalue1</em> 。25 行到 28 行则在插入完成后重新查询该键对应的值，29 行到 32 行删除该键对应的值，33 到 36 行则尝试在删除之后再次查询。现在我们考虑第 23 行插入的过程。</p>
+<h2 id="WriteBatch-编码规则"><a href="#WriteBatch-编码规则" class="headerlink" title="WriteBatch 编码规则"></a>WriteBatch 编码规则</h2><p>Debug 进入该函数，我们可以看到 <code>Put</code> 函数的内容</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// db_impl.cc</span><br><span class="hljs-function">Status <span class="hljs-title">DB::Put</span><span class="hljs-params">(<span class="hljs-type">const</span> WriteOptions&amp; opt, <span class="hljs-type">const</span> Slice&amp; key, <span class="hljs-type">const</span> Slice&amp; value)</span> </span>&#123;<br>  WriteBatch batch;<br>  batch.<span class="hljs-built_in">Put</span>(key, value);<br>  <span class="hljs-keyword">return</span> <span class="hljs-built_in">Write</span>(opt, &amp;batch);<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>首先，在进入这个函数之前，我们在 <code>main</code> 函数中以字符串形式存放的 key 和 value 被封装成了 <em>Slice</em> 对象。 Slice 类是一个简单的类，里面有存储了两个数据：以 <code>char*</code> 形式存储的 data 以及以 <code>size_t</code> 记录的 data 大小。这里在 key 对应的 Slice 里面，data 指向了 <code>testkey1</code>，size 则是 8；value 对应的 Slice 里 data 指向了 <code>testvalue</code>，size 则是 10 。</p>
+<p><code>Put</code> 函数的第一行声明了一个 <em>WriteBatch</em> 对象。LevelDB 对外提供了两种写入接口：<code>Put</code> 和 <code>Delete</code> 。在这两种操作中，数据库都会创建一个 WriteBatch 来执行对应的操作，一个 Batch 中的操作是原子的，其是数据库执行一次操作的最小单元。在 WriteBatch 中，所有的数据在被编码后存放在了一个名为 <em>rep_</em> 的 string 中。rep_ 在初始化时会被 resize 成 12 字节大小。这 12 个字节的前 8 个字节（即 64 个 bit）存放了操作的 sequence number，后 4 个字节（32 个 bit)存放了该 Batch 中操作的数量。sequence number 本质上是一个计数器，每个操作都对应了一个 sequence number 。该计数器在 leveldb 内部维护，每进行一次操作就累加一次。由于在 leveldb 中，一次更新或者一次删除，采用的是 append 的方式，而非直接更新原数据。因此对同样一个 key，会有多个版本的数据记录，而最大的 sequence number 对应的数据记录就是最新的。</p>
+<p>在 <code>Put</code> 函数的第二行，函数将写操作对应的 key 和 value 放入了 WriteBatch 中。我们跟着进入这个函数：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// write_batch.cc</span><br><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">WriteBatch::Put</span><span class="hljs-params">(<span class="hljs-type">const</span> Slice&amp; key, <span class="hljs-type">const</span> Slice&amp; value)</span> </span>&#123;<br>  <span class="hljs-comment">// set the count of operation item</span><br>  WriteBatchInternal::<span class="hljs-built_in">SetCount</span>(<span class="hljs-keyword">this</span>, WriteBatchInternal::<span class="hljs-built_in">Count</span>(<span class="hljs-keyword">this</span>) + <span class="hljs-number">1</span>);<br>  <span class="hljs-comment">// record the operation type</span><br>  rep_.<span class="hljs-built_in">push_back</span>(<span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">char</span>&gt;(kTypeValue));<br>  <span class="hljs-comment">// record the key</span><br>  <span class="hljs-built_in">PutLengthPrefixedSlice</span>(&amp;rep_, key);<br>  <span class="hljs-comment">// record the value</span><br>  <span class="hljs-built_in">PutLengthPrefixedSlice</span>(&amp;rep_, value);<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>可以看到，这个函数主要调用了四个函数做了四件事情：</p>
+<ul>
+<li>第一行调用 <code>SetCount</code> 函数，修改 rep_ 的第 9 到 12 个字节中所记录的操作数量，让它在原来的基础上加一。</li>
+<li>第二行将此次操作的类型记录进 rep_ 中，kTypeValue 是一个 enum 类型的数据，其值为 0x1，代表插入。删除所对应的类型为 kTypeDeletion，其值为 0x0 。</li>
+<li>第三行将 key 的数据编码进了 rep_ 中。</li>
+<li>第四行将 value 的数据编码进了 rep_ 中。</li>
+</ul>
+<p>在 <code>PutLengthPrefixedSlice</code> 中编码数据时，函数会先将数据的长度记录进 rep_ 中，再将数据的值记录到 rep_ 中。因此一个操作在 WriteBatch 中被编码为</p>
+<img src="Leveldb-operation_encode.png" srcset="/img/loading.gif" lazyload width=80%>
+
+<p>而整个 WriteBatch 在 rep_ 中的编码为</p>
+<img src="Leveldb-write_batch.png" srcset="/img/loading.gif" lazyload width=50%>
+
+<h2 id="合并写"><a href="#合并写" class="headerlink" title="合并写"></a>合并写</h2><p>回到 <em>db_impl.cc</em> 的 <code>Put</code> 函数中，其最后一个操作是将编码好的 WriteBatch 在数据库中写入。下面我们进入这个 <code>Write</code> 函数看一看。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// db_impl.cc</span><br><span class="hljs-function">Status <span class="hljs-title">DBImpl::Write</span><span class="hljs-params">(<span class="hljs-type">const</span> WriteOptions&amp; options, WriteBatch* updates)</span> </span>&#123;<br>  <span class="hljs-function">Writer <span class="hljs-title">w</span><span class="hljs-params">(&amp;mutex_)</span></span>;<br>  w.batch = updates;<br>  w.sync = options.sync;<br>  w.done = <span class="hljs-literal">false</span>;<br><br>  <span class="hljs-function">MutexLock <span class="hljs-title">l</span><span class="hljs-params">(&amp;mutex_)</span></span>;<br>  writers_.<span class="hljs-built_in">push_back</span>(&amp;w);<br>  <span class="hljs-keyword">while</span> (!w.done &amp;&amp; &amp;w != writers_.<span class="hljs-built_in">front</span>()) &#123;<br>    w.cv.<span class="hljs-built_in">Wait</span>();<br>  &#125;<br>  <span class="hljs-keyword">if</span> (w.done) &#123;<br>    <span class="hljs-keyword">return</span> w.status;<br>  &#125;<br><br>  <span class="hljs-comment">// May temporarily unlock and wait.</span><br>  Status status = <span class="hljs-built_in">MakeRoomForWrite</span>(updates == <span class="hljs-literal">nullptr</span>);<br>  <span class="hljs-type">uint64_t</span> last_sequence = versions_-&gt;<span class="hljs-built_in">LastSequence</span>();<br>  Writer* last_writer = &amp;w;<br>  <span class="hljs-keyword">if</span> (status.<span class="hljs-built_in">ok</span>() &amp;&amp; updates != <span class="hljs-literal">nullptr</span>) &#123;  <span class="hljs-comment">// nullptr batch is for compactions</span><br>    WriteBatch* write_batch = <span class="hljs-built_in">BuildBatchGroup</span>(&amp;last_writer);<br>    WriteBatchInternal::<span class="hljs-built_in">SetSequence</span>(write_batch, last_sequence + <span class="hljs-number">1</span>);<br>    last_sequence += WriteBatchInternal::<span class="hljs-built_in">Count</span>(write_batch);<br><br>    <span class="hljs-comment">// Add to log and apply to memtable.  We can release the lock</span><br>    <span class="hljs-comment">// during this phase since &amp;w is currently responsible for logging</span><br>    <span class="hljs-comment">// and protects against concurrent loggers and concurrent writes</span><br>    <span class="hljs-comment">// into mem_.</span><br>    &#123;<br>      mutex_.<span class="hljs-built_in">Unlock</span>();<br>      status = log_-&gt;<span class="hljs-built_in">AddRecord</span>(WriteBatchInternal::<span class="hljs-built_in">Contents</span>(write_batch));<br>      <span class="hljs-type">bool</span> sync_error = <span class="hljs-literal">false</span>;<br>      <span class="hljs-keyword">if</span> (status.<span class="hljs-built_in">ok</span>() &amp;&amp; options.sync) &#123;<br>        status = logfile_-&gt;<span class="hljs-built_in">Sync</span>();<br>        <span class="hljs-keyword">if</span> (!status.<span class="hljs-built_in">ok</span>()) &#123;<br>          sync_error = <span class="hljs-literal">true</span>;<br>        &#125;<br>      &#125;<br>      <span class="hljs-keyword">if</span> (status.<span class="hljs-built_in">ok</span>()) &#123;<br>        status = WriteBatchInternal::<span class="hljs-built_in">InsertInto</span>(write_batch, mem_);<br>      &#125;<br>      mutex_.<span class="hljs-built_in">Lock</span>();<br>      <span class="hljs-keyword">if</span> (sync_error) &#123;<br>        <span class="hljs-comment">// The state of the log file is indeterminate: the log record we</span><br>        <span class="hljs-comment">// just added may or may not show up when the DB is re-opened.</span><br>        <span class="hljs-comment">// So we force the DB into a mode where all future writes fail.</span><br>        <span class="hljs-built_in">RecordBackgroundError</span>(status);<br>      &#125;<br>    &#125;<br>    <span class="hljs-keyword">if</span> (write_batch == tmp_batch_) tmp_batch_-&gt;<span class="hljs-built_in">Clear</span>();<br><br>    versions_-&gt;<span class="hljs-built_in">SetLastSequence</span>(last_sequence);<br>  &#125;<br><br>  <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) &#123;<br>    Writer* ready = writers_.<span class="hljs-built_in">front</span>();<br>    writers_.<span class="hljs-built_in">pop_front</span>();<br>    <span class="hljs-keyword">if</span> (ready != &amp;w) &#123;<br>      ready-&gt;status = status;<br>      ready-&gt;done = <span class="hljs-literal">true</span>;<br>      ready-&gt;cv.<span class="hljs-built_in">Signal</span>();<br>    &#125;<br>    <span class="hljs-keyword">if</span> (ready == last_writer) <span class="hljs-keyword">break</span>;<br>  &#125;<br><br>  <span class="hljs-comment">// Notify new head of write queue</span><br>  <span class="hljs-keyword">if</span> (!writers_.<span class="hljs-built_in">empty</span>()) &#123;<br>    writers_.<span class="hljs-built_in">front</span>()-&gt;cv.<span class="hljs-built_in">Signal</span>();<br>  &#125;<br><br>  <span class="hljs-keyword">return</span> status;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这一段代码大致可以分为几个部分：</p>
+<ul>
+<li>第 8 到第 15 行获取锁，为写入获取权限。</li>
+<li>第 18 行会检查当前活动的 MemTable 是否有足够的空间供写入，以及 Level-0 的文件是否需要进行合并。如果这些检查不通过，则会在后台进行一系列的操作，使得内存中有一个合适的 MemTable 供此次写入操作执行。</li>
+<li>第 19 行到 53 行会进行包括 WAL 和实际数据的写入。第 41 行调用的 <code>WriteBatchInternal::InsertInto</code> 函数将数据插入到了 MemTable 中。</li>
+<li>第 56 到 70 行将 writer 从 Writer 队列中清除。</li>
+</ul>
+<p>在这个函数中，LevelDB 对多个并发写进行了优化，它会将同一时间内的“小写入”合并为一个“大写入”来执行，减少日志文件的小写入次数，增加整体的写入性能。假设同时有 6 个写入请求并发产生：w1，w2，w3，w4，w5，w6 。</p>
+<p><strong>【w1 的执行】</strong> 第 8 到第 15 行代码使得 w1 拿到了写锁，进入了 Writer 队列。此时队列中只有一个 w1 ，因此顺利地进行了 <code>BuildBatchGroup</code> 。到第 31 行时，w1 会释放锁。但是此时由于 w2 到 w6 并不在队列的头部，因此其一直被阻塞，不会影响 w1 的写入。当 w1 完成写入后，在 56 到 70 行中将自己清除出 Writer 队列，然后返回。</p>
+<p><strong>【剩余请求的执行】</strong> 假设此时 Writer 队列中的顺序为：w3，w5，w2，w4，w6 ，那么 w3 就进入 <code>BuildBatchGroup</code> ，在这一函数中 w3 会遍历 Writer 队列，在 WriteBatch 的总大小不超过一定限制的情况下，将尽可能多的写请求合并到自身的 WriteBatch ，合并的过程使用的就是前面所描述的 WriteBatch 的编码规则来进行的。假设这里 w3 将除了 w6 的所有请求都合并了，last_writer 会被置为 w4 。在 56 到 65 行，w3 会将 w5、w2、w4 都唤醒，将它们和自身一起清除出 Writer 队列，最后唤醒位于队首的 w6 。w6 会和 w1 一样执行下去，而 w5、w2、w4 则会在 13 到 15 行直接返回。</p>
+<h2 id="MemTable-插入"><a href="#MemTable-插入" class="headerlink" title="MemTable 插入"></a>MemTable 插入</h2><p>在前文中，我们忽略了位于 <code>WriteBatchInternal::InsertInto</code> 的插入过程。本节我们来看一看数据是如何插入 MemTable 中的。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// write_batch.cc</span><br><span class="hljs-function">Status <span class="hljs-title">WriteBatchInternal::InsertInto</span><span class="hljs-params">(<span class="hljs-type">const</span> WriteBatch* b, MemTable* memtable)</span> </span>&#123;<br>  MemTableInserter inserter;<br>  inserter.sequence_ = WriteBatchInternal::<span class="hljs-built_in">Sequence</span>(b);<br>  inserter.mem_ = memtable;<br>  <span class="hljs-keyword">return</span> b-&gt;<span class="hljs-built_in">Iterate</span>(&amp;inserter);<br>&#125;<br><br><span class="hljs-function">Status <span class="hljs-title">WriteBatch::Iterate</span><span class="hljs-params">(Handler* handler)</span> <span class="hljs-type">const</span> </span>&#123;<br>  <span class="hljs-function">Slice <span class="hljs-title">input</span><span class="hljs-params">(rep_)</span></span>;<br>  <span class="hljs-keyword">if</span> (input.<span class="hljs-built_in">size</span>() &lt; kHeader) &#123;<br>    <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">Corruption</span>(<span class="hljs-string">&quot;malformed WriteBatch (too small)&quot;</span>);<br>  &#125;<br><br>  input.<span class="hljs-built_in">remove_prefix</span>(kHeader);<br>  Slice key, value;<br>  <span class="hljs-type">int</span> found = <span class="hljs-number">0</span>;<br>  <span class="hljs-keyword">while</span> (!input.<span class="hljs-built_in">empty</span>()) &#123;<br>    found++;<br>    <span class="hljs-type">char</span> tag = input[<span class="hljs-number">0</span>];<br>    input.<span class="hljs-built_in">remove_prefix</span>(<span class="hljs-number">1</span>);<br>    <span class="hljs-keyword">switch</span> (tag) &#123;<br>      <span class="hljs-keyword">case</span> kTypeValue:<br>        <span class="hljs-keyword">if</span> (<span class="hljs-built_in">GetLengthPrefixedSlice</span>(&amp;input, &amp;key) &amp;&amp;<br>            <span class="hljs-built_in">GetLengthPrefixedSlice</span>(&amp;input, &amp;value)) &#123;<br>          handler-&gt;<span class="hljs-built_in">Put</span>(key, value);<br>        &#125; <span class="hljs-keyword">else</span> &#123;<br>          <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">Corruption</span>(<span class="hljs-string">&quot;bad WriteBatch Put&quot;</span>);<br>        &#125;<br>        <span class="hljs-keyword">break</span>;<br>      <span class="hljs-keyword">case</span> kTypeDeletion:<br>        <span class="hljs-keyword">if</span> (<span class="hljs-built_in">GetLengthPrefixedSlice</span>(&amp;input, &amp;key)) &#123;<br>          handler-&gt;<span class="hljs-built_in">Delete</span>(key);<br>        &#125; <span class="hljs-keyword">else</span> &#123;<br>          <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">Corruption</span>(<span class="hljs-string">&quot;bad WriteBatch Delete&quot;</span>);<br>        &#125;<br>        <span class="hljs-keyword">break</span>;<br>      <span class="hljs-keyword">default</span>:<br>        <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">Corruption</span>(<span class="hljs-string">&quot;unknown WriteBatch tag&quot;</span>);<br>    &#125;<br>  &#125;<br>  <span class="hljs-keyword">if</span> (found != WriteBatchInternal::<span class="hljs-built_in">Count</span>(<span class="hljs-keyword">this</span>)) &#123;<br>    <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">Corruption</span>(<span class="hljs-string">&quot;WriteBatch has wrong count&quot;</span>);<br>  &#125; <span class="hljs-keyword">else</span> &#123;<br>    <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">OK</span>();<br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>函数中会新建一个 <em>MemTableInserter</em>，设置好对应的参数后由 WriteBatch 的 <code>Iterate</code> 方法来执行对 MemTable 的插入。</p>
+<p>在 <code>Iterate</code> 方法中，首先会将 WriteBatch 自身的 rep_ 包装为一个 Slice 。前面我们解释 Slice 结构时提到过，Slice 中只有一个以 char* 记录的数据内容和以 size_t 记录的数据大小。随后，系统将 rep_ 的数据头剪切掉，只剩下操作记录的部分。随后不断获取操作记录，如果是插入（Put），则获取其 key 和 value；如果是删除（Delete），则只需要获取其 key 。获取到记录后将其通过 Handler（即前面的 MemTableInserter）插入到 MemTable 中，并记录操作记录的数目。最后检查从 rep_ 中读出的操作数记录的数目是否与 rep_ 中记录的相同。</p>
+<p>说到这里，还是没有讲到如何在 MemTable 中插入数据。以插入数据为例，MemTableInserter 的插入函数会调用 MemTable 的 <code>Add</code> 函数，该函数的细节如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// memtable.cc</span><br><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">MemTable::Add</span><span class="hljs-params">(SequenceNumber s, ValueType type, <span class="hljs-type">const</span> Slice&amp; key,</span></span><br><span class="hljs-params"><span class="hljs-function">                   <span class="hljs-type">const</span> Slice&amp; value)</span> </span>&#123;<br>  <span class="hljs-comment">// Format of an entry is concatenation of:</span><br>  <span class="hljs-comment">//  key_size     : varint32 of internal_key.size()</span><br>  <span class="hljs-comment">//  key bytes    : char[internal_key.size()]</span><br>  <span class="hljs-comment">//  value_size   : varint32 of value.size()</span><br>  <span class="hljs-comment">//  value bytes  : char[value.size()]</span><br>  <span class="hljs-type">size_t</span> key_size = key.<span class="hljs-built_in">size</span>();<br>  <span class="hljs-type">size_t</span> val_size = value.<span class="hljs-built_in">size</span>();<br>  <span class="hljs-comment">// the internal key is 8 byte bigger than origin key</span><br>  <span class="hljs-type">size_t</span> internal_key_size = key_size + <span class="hljs-number">8</span>;<br>  <span class="hljs-comment">// get the total length of new encode format</span><br>  <span class="hljs-type">const</span> <span class="hljs-type">size_t</span> encoded_len = <span class="hljs-built_in">VarintLength</span>(internal_key_size) +<br>                             internal_key_size + <span class="hljs-built_in">VarintLength</span>(val_size) +<br>                             val_size;<br>  <span class="hljs-comment">// allocate space for new encode data</span><br>  <span class="hljs-type">char</span>* buf = arena_.<span class="hljs-built_in">Allocate</span>(encoded_len);<br>  <span class="hljs-comment">// encode the internal key size to the buffer</span><br>  <span class="hljs-type">char</span>* p = <span class="hljs-built_in">EncodeVarint32</span>(buf, internal_key_size);<br>  <span class="hljs-comment">// encode the key value to the buffer</span><br>  std::<span class="hljs-built_in">memcpy</span>(p, key.<span class="hljs-built_in">data</span>(), key_size);<br>  p += key_size;<br>  <span class="hljs-comment">// encode the sequence number and operation type into buffer</span><br>  <span class="hljs-built_in">EncodeFixed64</span>(p, (s &lt;&lt; <span class="hljs-number">8</span>) | type);<br>  p += <span class="hljs-number">8</span>;<br>  <span class="hljs-comment">// encode the value size</span><br>  p = <span class="hljs-built_in">EncodeVarint32</span>(p, val_size);<br>  <span class="hljs-comment">// encode the value data</span><br>  std::<span class="hljs-built_in">memcpy</span>(p, value.<span class="hljs-built_in">data</span>(), val_size);<br>  <span class="hljs-built_in">assert</span>(p + val_size == buf + encoded_len);<br>  <span class="hljs-comment">// insert the encoded data to skip list</span><br>  <span class="hljs-comment">// skip list is the data structure which used by memtable to store data</span><br>  table_.<span class="hljs-built_in">Insert</span>(buf);<br>&#125;<br></code></pre></td></tr></table></figure>
+<p>在这个函数中，原本的 key 被重新编码为 internal_key，然后重新和 value 编码到 buffer 中。internal_key 在 key_len 和 key_data 的后面追加了 7 个字节的 seqence number 和一个字节的 operation type 。</p>
+<img src="Leveldb-internal_key.png" srcset="/img/loading.gif" lazyload width=65%>
+
+<p>编码完成后，这个 buffer 会被插入到一个名为 SkipList 的数据结构中。SkipList 是 MemTable 内部用以存放数据的数据结构，其结构比较复杂，本文就不展开讲了，后面的文章会介绍这个 MemTable 的结构和实现。</p>
+<p>至此，LevelDB 的写流程就介绍结束了。LevelDB 写流程主要有两个点值得我们注意：</p>
+<ul>
+<li>不同操作（写入、删除）在内存中的编码方式</li>
+<li>对并发写的合并</li>
+</ul>
+<p>前者在用尽量少的空间优雅地编码了一个或多个操作记录，后者则巧妙地将多个并发写合并为了一个原子写，这两点非常值得我们反复品味。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a target="_blank" rel="noopener" href="https://leveldb-handbook.readthedocs.io/zh/latest/">LevelDB Handbook</a></p>
+<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_30871293/article/details/98269550">LevelDB 合并写详情</a></p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" class="category-chain-item">数据库</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/" class="category-chain-item">源代码阅读</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/LevelDB/" class="category-chain-item">LevelDB</a>
+  
+  
+
+  
+
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>LevelDB 源代码阅读（一）：写流程</div>
+      <div>http://example.com/2021/07/08/leveldb-source-code-reading-1/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2021年7月8日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/07/10/Leveldb-source-code-reading-2/" title="LevelDB 源代码阅读（二）：读流程">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">LevelDB 源代码阅读（二）：读流程</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/03/23/OS-IPC/" title="操作系统（三）：进程间通信">
+                        <span class="hidden-mobile">操作系统（三）：进程间通信</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
