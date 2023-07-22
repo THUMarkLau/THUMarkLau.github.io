@@ -1,0 +1,827 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="虚拟内存为了让每个应用都可以高效又安全地使用物理内存，现代操作系统中会在应用程序和物理内存之间加入一层新的抽象：虚拟内存。应用程序在编写时仅考虑虚拟内存，CPU 在运行时将应用程序的虚拟内存地址翻译成物理内存地址，操作系统负责设置虚拟地址与物理地址之间的映射。 虚拟内存的设计有以下三个目标：  高效性：虚拟内存不能在程序运行过程中造成明显的性能开销，且虚拟内存抽象也不应该占用过多的物理内存资源。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="操作系统（一）：内存">
+<meta property="og:url" content="https://thumarklau.github.io/2021/03/11/OS-memory/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="虚拟内存为了让每个应用都可以高效又安全地使用物理内存，现代操作系统中会在应用程序和物理内存之间加入一层新的抽象：虚拟内存。应用程序在编写时仅考虑虚拟内存，CPU 在运行时将应用程序的虚拟内存地址翻译成物理内存地址，操作系统负责设置虚拟地址与物理地址之间的映射。 虚拟内存的设计有以下三个目标：  高效性：虚拟内存不能在程序运行过程中造成明显的性能开销，且虚拟内存抽象也不应该占用过多的物理内存资源。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://thumarklau.github.io/2021/03/11/OS-memory/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E7%BF%BB%E8%AF%91-%E6%AE%B5.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/03/11/OS-memory/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E7%BF%BB%E8%AF%91-%E9%A1%B5.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/03/11/OS-memory/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E7%BF%BB%E8%AF%91-%E5%A4%9A%E7%BA%A7%E9%A1%B5.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/03/11/OS-memory/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E7%BF%BB%E8%AF%91-%E7%A9%BA%E9%97%B2%E9%93%BE%E8%A1%A8.png">
+<meta property="article:published_time" content="2021-03-11T06:26:18.000Z">
+<meta property="article:modified_time" content="2023-07-19T13:57:08.365Z">
+<meta property="article:author" content="MarkLau">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thumarklau.github.io/2021/03/11/OS-memory/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E7%BF%BB%E8%AF%91-%E6%AE%B5.png">
+  
+  
+  
+  <title>操作系统（一）：内存 - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"thumarklau.github.io","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="操作系统（一）：内存"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2021-03-11 14:26" pubdate>
+          2021年3月11日 下午
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          3.4k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          29 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">操作系统（一）：内存</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="虚拟内存"><a href="#虚拟内存" class="headerlink" title="虚拟内存"></a>虚拟内存</h1><p>为了让每个应用都可以高效又安全地使用物理内存，现代操作系统中会在应用程序和物理内存之间加入一层新的抽象：虚拟内存。应用程序在编写时仅考虑虚拟内存，CPU 在运行时将应用程序的虚拟内存地址翻译成物理内存地址，操作系统负责设置虚拟地址与物理地址之间的映射。</p>
+<p>虚拟内存的设计有以下三个目标：</p>
+<ul>
+<li>高效性：虚拟内存不能在程序运行过程中造成明显的性能开销，且虚拟内存抽象也不应该占用过多的物理内存资源。</li>
+<li>安全性：虚拟内存应使得不同应用程序之间的内存相互隔离。</li>
+<li>透明性：应用程序开发者在变成时无需考虑虚拟内存抽象。</li>
+</ul>
+<h2 id="虚拟内存的翻译"><a href="#虚拟内存的翻译" class="headerlink" title="虚拟内存的翻译"></a>虚拟内存的翻译</h2><p>在使用虚拟内存的情况下，CPU 取指令时发出的时指令的虚拟地址，该虚拟地址被内存管理单元（Memory Management Unit，MMU）翻译为对应的物理地址，包含改物理地址的内存读请求被发送到物理内存设备，然后物理内存设备把该物理地址对应的内容发送给 CPU。为了加速翻译，现代 CPU 都引入了转址旁路缓存（Translation Lookaside Buffer，TLB）。</p>
+<p>MMU 将虚拟地址翻译为物理地址的主要机制有两种：分段机制与分页机制，下面分别介绍。</p>
+<h3 id="基于分段的虚拟地址"><a href="#基于分段的虚拟地址" class="headerlink" title="基于分段的虚拟地址"></a>基于分段的虚拟地址</h3><p>在分段机制中，操作系统以“段”的形式管理物理内存。CPU 访问虚拟内存空间中某一个段时，MMU 会通过查询<strong>段表</strong>得到该段对应的物理地址区域。</p>
+<img src="虚拟内存翻译-段.png" srcset="/img/loading.gif" lazyload width="65%">
+
+<p>虚拟地址由两个部分构成：高位的段号和低位的段内偏移。在翻译时，MMU 首先通过段表基地址寄存器找到段表的位置，结合虚拟地址中的段号，找到对应物理段的信息；然后取出该段的起始地址（物理地址），加上待翻译虚拟地址中的段地址（偏移量），就能够得到最终的物理地址。</p>
+<p>在分段机制下，不仅虚拟内存空间被划分成不同的段，物理内存也以段为单位进行分配。这种段式分配方式容易导致在物理内存中出现外部碎片，即在段与段之间留下碎片空间，从而造成物理内存资源利用率的降低。</p>
+<h3 id="基于分页的虚拟地址"><a href="#基于分页的虚拟地址" class="headerlink" title="基于分页的虚拟地址"></a>基于分页的虚拟地址</h3><h4 id="虚拟地址翻译"><a href="#虚拟地址翻译" class="headerlink" title="虚拟地址翻译"></a>虚拟地址翻译</h4><p>在 x86-64 架构之后，基于分页机制的虚拟内存已经成为主流。分页机制的思想是将虚拟内存地址空间划分成连续的、等长的虚拟页（显著区别于分段机制下不同长度的段），同时物理内存也被划分为连续的、等长的物理页。虚拟页和物理页的页长固定且相等，操作系统可以很方便地为每个应用程序构造<strong>页表</strong>，即虚拟页到物理页的映射关系表。类似于分段机制下的虚拟地址，分页机制下的虚拟地址分为两个部分：高位的页号和低位的页内地址。</p>
+<img src="虚拟内存翻译-页.png" srcset="/img/loading.gif" lazyload width="65%">
+
+<p>在翻译时，MMU 首先解析得到虚拟地址中的虚拟页号，然后通过页表基地址寄存器找到页表，查询该虚拟页号对应的物理页号，最后用该物理页号对应的物理页的起始地址加上虚拟地址中的页内偏移得到最终的物理地址。</p>
+<p>在分页机制下，连续的虚拟页可以对应离散的物理页，因此可以实现物理内存资源的离散分配。并且，分页机制按照固定页大小分配物理内存，可以有效避免分段机制中的外部碎片。</p>
+<h4 id="多级页表"><a href="#多级页表" class="headerlink" title="多级页表"></a>多级页表</h4><p>页表是分页机制中的关键部分，如果仅使用一张简单的页表来记录映射关系，那么对于 64 位的虚拟地址空间，假设一个页的大小为 4 KB，页表中每一项的大小为 8 字节，那么这个页表的大小就是 $2^{64}&#x2F;4 KB * 8$ 字节，即 33554432 GB。显然，这是不可接受的。因此，人们又设计出了多级页表来节省页表所占用的空间。</p>
+<img src="虚拟内存翻译-多级页.png" srcset="/img/loading.gif" lazyload width="65%">
+
+<p>在使用多级页表时，一个虚拟地址中仍然可以划分为页号和页内偏移量。但是页号被进一步划分成 k 个部分，每一个部分对应着其在每一级页表中所对应的项。在多级页表中，除了最后一级页表中的项是映射到物理页，其余的页表都映射到下一级页表上。注意，在 0 到 k - 1 级页表中，其条目可以为空，该空条目的子页表也就不存在。换句话说，多级页表允许在整个页表结构中出现空洞，而单级页表则不允许。在实际使用中，大多数虚拟地址空间都是未分配的，因此多级页表可以部分创建，进而节省内存空间。</p>
+<h4 id="TLB"><a href="#TLB" class="headerlink" title="TLB"></a>TLB</h4><p>多级页表可以压缩页表的大小，但是会增加虚拟地址翻译的延迟。所以人们在 MMU 中加入了转址旁路缓存（TLB）来加速翻译的过程。TLB 相当于一个哈希表，将虚拟页号映射到物理页号上。考虑虚拟地址 VA，其在应用 A 和应用 B 中所对应的物理页是不同的，因此操作系统在切换应用程序时需要刷新 TLB 。</p>
+<h2 id="虚拟内存的管理"><a href="#虚拟内存的管理" class="headerlink" title="虚拟内存的管理"></a>虚拟内存的管理</h2><h3 id="换页与缺页异常"><a href="#换页与缺页异常" class="headerlink" title="换页与缺页异常"></a>换页与缺页异常</h3><p>如果虚拟页没有被分配使用，那么页表中自然没有对应的物理页映射。反过来，被分配使用的虚拟页在页表中一定有相应的物理页映射吗？答案是否定的。</p>
+<p>虚拟内存中存在换页机制。该机制的基本思想是：当物理内存容量不够的时候，操作系统把若干物理页写入磁盘中，然后回收物理页。当操作系统希望从应用程序 A 回收物理页 P （对应 A 的虚拟页 V）时，其会将物理页 P 的内容写入磁盘中一个位置，并且在应用程序 A 的页表中去除虚拟页 V 的映射，同时记录该物理页写入磁盘时的位置。这一过程叫做换出。此时，虚拟页 V 就处于已分配但未映射的状态。</p>
+<p>当程序访问到已分配但未映射的虚拟页时，就会触发缺页异常，此时会运行操作系统预先定义的缺页异常处理函数。该函数会找到一个空闲的物理页，将磁盘中的数据重新加载到该物理页中，并且在页表中填写虚拟地址到该物理页的映射。这一过程被称为换入。</p>
+<h3 id="换页策略"><a href="#换页策略" class="headerlink" title="换页策略"></a>换页策略</h3><p>常见的换页策略有：FIFO 策略、Second Chance 策略、LRU 策略、MRU 策略、时钟算法策略。</p>
+<h4 id="FIFO-策略"><a href="#FIFO-策略" class="headerlink" title="FIFO 策略"></a>FIFO 策略</h4><p>FIFO 策略优先选择最先换入的页进行换出。操作系统维护一个队列，每换入一个页就将其加入队尾，需要换出页时则从队列头选择页。这种算法在实际中表现不佳，也几乎不会被现代操作系统采用。</p>
+<h4 id="Second-Chance-策略"><a href="#Second-Chance-策略" class="headerlink" title="Second Chance 策略"></a>Second Chance 策略</h4><p>Second Chance 策略是 FIFO 策略的改进版。其在每个记录的物理页上增加了一个访问标志位，在寻找需要换出的内存页时，该策略优先查看位于队头的内存页。如果该内存页的访问标志位没有被置上，则换出该页；否则，将其标志位清空，并将其挪到队尾，然后继续从队头寻找符合条件的内存页。</p>
+<h4 id="LRU-策略"><a href="#LRU-策略" class="headerlink" title="LRU 策略"></a>LRU 策略</h4><p>LRU 策略会记录每个物理页被访问的时间，在寻找物理页进行换出时，优先选择那些最久未被访问的物理页。</p>
+<h4 id="MRU-策略"><a href="#MRU-策略" class="headerlink" title="MRU 策略"></a>MRU 策略</h4><p>MRU 策略和 LRU 策略相反，在寻找物理页进行换出时，会优先选择那些最近被访问的物理页。</p>
+<h4 id="时钟算法策略"><a href="#时钟算法策略" class="headerlink" title="时钟算法策略"></a>时钟算法策略</h4><p>时钟算法将换入物理内存的页号排成一个时钟的形状。该时钟有一个针臂，指向新换入内存的页号的后一个。同时，也为每个页号维护一个访问标志位。每次需要选择换出页号时，该算法从针臂所指的页号开始检查。如果当前页号的访问位没有设置，则将该页换出；否则，将其访问标志位清空，并将针臂顺时针移动到下一个页号。时钟算法策略类似 Second Chance 策略，但实现上更高效些。</p>
+<h1 id="物理内存"><a href="#物理内存" class="headerlink" title="物理内存"></a>物理内存</h1><h2 id="物理内存的分配"><a href="#物理内存的分配" class="headerlink" title="物理内存的分配"></a>物理内存的分配</h2><p>物理内存的分配有两个评价指标：内存资源利用率、分配性能。内存资源利用率要求分配机制可以减少内部碎片和外部碎片的大小；分配性能要求分配机制尽可能降低分配延迟和节约 CPU 资源。</p>
+<h3 id="伙伴系统"><a href="#伙伴系统" class="headerlink" title="伙伴系统"></a>伙伴系统</h3><p>伙伴系统是现代操作系统中广泛使用的机制。其基本思想是将物理内存划分成连续的块，以块为单位进行分配。不同块的大小可以不同，但每个块都有一个或多个连续的物理页组成，物理页的数量必须是 2 的 n 次幂（$0 \le n &lt;$ 预设的最大值）。当一个请求需要分配 m 个物理页时，伙伴系统将寻找一个大小合适的块，该块包括 $2^n$ 个物理页，且满足 $2^{n-1} &lt; m \le 2^{n}$。在处理分配请求的过程中，大的块可以分裂成两半，这两个块互为伙伴。分裂得到的块可以继续分裂，直到一个大小合适的块去服务相应的分配请求。在一个块被释放后，分配器会找到其伙伴块，若伙伴块也处于空闲的状态，则可以将这两个块进行合并，合并得到的块可以进一步向上合并。由于分裂操作和合并操作都是级联的，因此可以很好地解决外部碎片的问题。</p>
+<img src="虚拟内存翻译-空闲链表.png" srcset="/img/loading.gif" lazyload width="45%">
+
+<p>在实际中，常用空闲列表去实现伙伴系统。具体来说，全局有一个有序数组，其每一项都指向一条空闲链表，每条链表将其对应大小的空闲块连接起来（一条链表中的空闲块大小相同）。当收到分配请求之后，伙伴分配器首先计算应该分配多大的空闲块，然后查找对应的空闲链表。例如，请求的大小是 15 KB，则应该分配一个 16 KB 的块。因此首先查找第二条 $2^2$ 空闲链表，如果链表不为空，则取出头节点的空闲块分配即可。但是在图中该链表为空，则继续访问第三条 $2^3$ 空闲链表，取出一个空闲块（32 KB），将其分裂成两个 16 KB 的空闲块，一块用于服务请求，另一个则插入 $2^2$ 这条空闲链表中。</p>
+<h1 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h1><p><a target="_blank" rel="noopener" href="https://item.jd.com/12731379.html">现代操作系统：原理与实现</a>第 4 章</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" class="category-chain-item">计算机科学</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" class="category-chain-item">操作系统</a>
+  
+  
+
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>操作系统（一）：内存</div>
+      <div>https://thumarklau.github.io/2021/03/11/OS-memory/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2021年3月11日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="SA - 相同方式共享">
+                    <i class="iconfont icon-sa"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/03/12/OS-process-and-thread/" title="操作系统（二）：进程与线程">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">操作系统（二）：进程与线程</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2020/12/04/CUDA-PROGRAMMING-IN-WINDOWS/" title="Windows 下使用 Visual Studio 2019 进行 CUDA 编程">
+                        <span class="hidden-mobile">Windows 下使用 Visual Studio 2019 进行 CUDA 编程</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  
+      <script>
+        if (!window.MathJax) {
+          window.MathJax = {
+            tex    : {
+              inlineMath: { '[+]': [['$', '$']] }
+            },
+            loader : {
+              load: ['ui/lazy']
+            },
+            options: {
+              renderActions: {
+                insertedScript: [200, () => {
+                  document.querySelectorAll('mjx-container').forEach(node => {
+                    let target = node.parentNode;
+                    if (target.nodeName.toLowerCase() === 'li') {
+                      target.parentNode.classList.add('has-jax');
+                    }
+                  });
+                }, '', false]
+              }
+            }
+          };
+        } else {
+          MathJax.startup.document.state(0);
+          MathJax.texReset();
+          MathJax.typeset();
+          MathJax.typesetPromise();
+        }
+
+        Fluid.events.registerRefreshCallback(function() {
+          if ('MathJax' in window && MathJax.startup.document && typeof MathJax.startup.document.state === 'function') {
+            MathJax.startup.document.state(0);
+            MathJax.texReset();
+            MathJax.typeset();
+            MathJax.typesetPromise();
+          }
+        });
+      </script>
+    
+
+  <script  src="https://lib.baomitu.com/mathjax/3.2.2/es5/tex-mml-chtml.js" ></script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

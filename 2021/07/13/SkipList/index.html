@@ -1,0 +1,844 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="LevelDB 和一众 NoSQL 数据库都使用 LSM 树作为其存储模型，其中 MemTable 是非常重要的一个数据结构。在 LevelDB 的实现中，MemTable 是通过一种名为跳表（SkipList）来存储数据的。跳表最早由 William Pugh 在论文《SkipList: A Probabilistic Alternative to Balanaced Tree》 中提出，本文是">
+<meta property="og:type" content="article">
+<meta property="og:title" content="跳表：平衡树的概率替代方案">
+<meta property="og:url" content="https://thumarklau.github.io/2021/07/13/SkipList/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="LevelDB 和一众 NoSQL 数据库都使用 LSM 树作为其存储模型，其中 MemTable 是非常重要的一个数据结构。在 LevelDB 的实现中，MemTable 是通过一种名为跳表（SkipList）来存储数据的。跳表最早由 William Pugh 在论文《SkipList: A Probabilistic Alternative to Balanaced Tree》 中提出，本文是">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/13/SkipList/Figure1.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/13/SkipList/Figure2.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/13/SkipList/Figure3.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/13/SkipList/Figure4.png">
+<meta property="article:published_time" content="2021-07-13T13:53:13.000Z">
+<meta property="article:modified_time" content="2023-07-19T13:57:08.371Z">
+<meta property="article:author" content="MarkLau">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thumarklau.github.io/2021/07/13/SkipList/Figure1.png">
+  
+  
+  
+  <title>跳表：平衡树的概率替代方案 - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"thumarklau.github.io","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="跳表：平衡树的概率替代方案"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2021-07-13 21:53" pubdate>
+          2021年7月13日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          11k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          93 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">跳表：平衡树的概率替代方案</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>LevelDB 和一众 NoSQL 数据库都使用 LSM 树作为其存储模型，其中 MemTable 是非常重要的一个数据结构。在 LevelDB 的实现中，MemTable 是通过一种名为跳表（SkipList）来存储数据的。跳表最早由 William Pugh 在论文《SkipList: A Probabilistic Alternative to Balanaced Tree》 中提出，本文是对这篇论文前几节有关数据结构部分的翻译，有兴趣的读者可以直接去阅读<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/78973.78977">原文</a>。</p>
+<h1 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h1><p>跳表是一种使用概率平衡而不是严格平衡的数据机构。因此，跳表的插入和删除算法都比平衡树中对应的算法都更简单且快速。</p>
+<p><em>Skip lists are data structures that use probabilistic balancing rather than strictly enforced balancing. As a result, the algorithms for insertion and deletion in skip lists are much simpler and significantly faster than equivalent algorithms for balanced trees.</em></p>
+<h1 id="正文"><a href="#正文" class="headerlink" title="正文"></a>正文</h1><p>二叉树可以用来表示如字典或者有序列表这样的抽象数据结构，当元素以随机顺序插入时它们能够运行得很好。一些如顺序插入元素这样的操作，会导致二叉树变成性能非常差的退化数据结构。如果允许讲待插入的元素列表进行随机打乱，那么二叉树在任何输入序列下大概率都会工作得很好。但是在大多数情况下，查询都必须在线返回，因此随机排列输入时不现实的。平衡树算法在执行插入操作时重新调整树的结构，以保持较好的平衡性并确保良好的性能。</p>
+<p><em>Binary trees can be used for representing abstract data types such as dictionaries and ordered lists. They work well when the elements are inserted in a random order. Some sequences of operations, such as inserting the elements in order, produce degenerate data structures that perform very poorly. If it were possible to randomly permute the list of items to be inserted, trees would work well with high probability for any input sequence. In most cases queries must be answered online, so randomly permuting the input is impractical. Balanced tree algorithms rearrange the tree as operations are performed to maintain certain balance conditions and assure good performance.</em></p>
+<p><strong>跳表</strong>是一种平衡树的概率替代方案，其通过查询随机数生成器来保持平衡。尽管在最坏情况下跳表的性能非常差，但是没有任何序列能一直导致跳表进入最坏的情况（就像快排的时候主元素的选择是随机的）。对于一个跳表来说，其结构变得非常不平衡的概率是非常小的（例如，对于一个有超过 250 元素的字典来说，一次搜索所花费的时间超过预期时间的三倍的可能性小于一百万分之一）。跳表拥有类似随机插入元素形成的搜索树的平衡性，但是它不需要插入时的元素是随机的。</p>
+<p><em>Skip lists are a probabilistic alternative to balanced trees. Skip lists are balanced by consulting a random number generator. Although skip lists have bad worstcase performance, no input sequence consistently produces the worstcase performance (much like quicksort when the pivot element is chosen randomly). It is very unlikely a skip list data structure will be significantly unbalanced (e.g., for a dictionary of more than 250 elements, the chance that a search will take more than three-times the expecied time is less than one in a million). Skip lists have balance properties similar to that of search trees built by random insertions, yet do not require insertions to be random.</em></p>
+<p>对于一个数据结构来说，保持概率性的平衡比保持严格的平衡要更加容易。对于大多数应用来说，跳表是一种比树更加自然的数据表示方式，并且使用跳表可以使算法更加简单。跳表的简洁性使得它们更容易实现，并且相较于平衡树和其他自平衡树算法，跳表提供了常数倍性能优化。跳表对空间的使用效率也非常高，它可以很轻易地通过配置来实现对平均只对 1 % （或者更少）的元素使用的指针，并且每个节点也不需要存储任何的平衡或优先级信息。</p>
+<p><em>It is easier to balance a data structure probabilistitally than to explicitly maintain the balance. For many applications, skip lists are a more natural representation than trees, and they lead to simpler algorithms. The simplicity of skip list algorithms makes them easier to implement and provides significant constant factor speed improvements over balanced tree and self-adjusting tree algorithms. Skip lists are also very space efficient. They can easily be configured to require an average of 1% pointers per element (or even less) and do not require balance or priority information to be stored with each node.</em></p>
+<h2 id="跳表"><a href="#跳表" class="headerlink" title="跳表"></a>跳表</h2><p>当我们在搜索一个链表时，有可能需要检查链表的每一个节点（如图 1a）。如果链表是按照顺序存放的，并且链表中的每两个节点都有一个指向位于它两个节点前的节点的指针（如图 1<br>b），我们就只需要检查不超过 $\lceil n &#x2F; 2 \rceil$ 个节点（其中 $n$ 是链表的长度）。同样的，假如每四个节点都有一个指针指向位于它四个节点前的节点的指针（如图 1c），那么就只需要检查 $\lceil n &#x2F; 4\rceil + 2$ 个节点。假如每 $(2^i)$ 个节点就有一个指针指向位于它 $(2^i)$ 个节点前的节点的指针，那么仅仅通过将指针数量加倍就可以使一次搜索所需要检查的节点个数可以减少到 $\lceil \log_2 n \rceil$ 。这样的一种数据结构可以用来进行快速查找，但是对它的插入和删除将变得很困难。</p>
+<p><em>We might need to examine every node of the list when searching a linked list (Figure la). If the list is stored in sorted order and every other node of the list also has a pointer to the node two ahead of it in the list (Figure lb), we have to examine no more than $\lceil n&#x2F;2\rceil + 1$ nodes (where n is the length of the list). Also giving every fourth node a pointer four ahead (Figure lc) requires that no more than $\lceil n &#x2F; 4\rceil + 2$ nodes be examined. If every ($(2^i)$th node has a pointer $(2^i)$ nodes ahead (Figure 1d), the number of nodes that must be examined can be reduced to $\lceil \log_2 n \rceil$ while only doubling the number of pointers. This data structure could be used for fast searching, but insertion and deletion would be impractical.</em></p>
+<div style="font-size:13px; text-align:center; line-height: 0px">
+
+<img src="Figure1.png" srcset="/img/loading.gif" lazyload>
+
+<p><em>Figure 1</em></p>
+</div>
+
+<p>如果一个节点拥有 k 个指向前面节点的指针，那么这个节点被称为 k 层节点。如果每 $2^i$ 个节点就有一个节点拥有一个指针指向 $2^i$ 个节点之前的那个节点，那么链表中节点的层级分布遵循这样一个简单的模式：50 % 的节点是 1 层节点，25 % 的节点是 2 层节点，12.5 % 的节点是 3 层节点，等等。假如节点的层级是随机选择的，但是所有节点的层级分布不变（如图 1e），会发生什么呢？一个节点的第 $i$ 个指针，指向了下一个 $i$ 层或高于 $i$ 层的节点，而不是位于前方 $2^{i-1}$ 节点之前的那个节点。插入或者删除只需要进行本地修改，一个节点的层级在它被插入时就被随机的选择，并且不需要再进行修改。有一些层级排布的情况会导致结构变得很差，但是我们会发现这样的情况是很少的。因为这样的数据结构是一种带着用以跳过中间节点的额外指针的链表，我把它称之为跳表。</p>
+<p><em>A node that has k forward pointers is called a level k node. If every $(2^i)$th node has a pointer $2^i$ nodes ahead, then levels of nodes are distributed in a simple pattern: 50 percent are level 1, 25 percent are level 2, 12.5 percent are level 3 and so on. What would happen if the levels of nodes were chosen randomly, but in the same proportions (e.g., as in Figure 1e)? A node’s $i$ th forward pointer, instead of pointing $2^{i-1}$ nodes ahead, points to the next node of level $i$ or higher. Insertions or deletions would require only local modifications; the level of a node, chosen randomly when the node is inserted, need never change. Some arrangements of levels would give poor execution times, but we will see that such arrangements are rare. Because these data structures are linked lists with extra pointers that skip over intermediate nodes, I named them skip lists.</em></p>
+<h2 id="跳表算法"><a href="#跳表算法" class="headerlink" title="跳表算法"></a>跳表算法</h2><p>这一节描述了对跳表算法来说如何进行查找，以及如何对一个字典或符号表中的元素进行插入和删除。搜索操作返回与目标键相关联的值的内容，当目标键不存在时操作会失败。插入操作将一个指定的键和一个新的值关联起来（如果这个键没有出现过，那么就将这个键插入到数据结构中）。删除操作会将指定的键删除。支持如寻找最小键或者寻找下一个键这样的附加操作是很容易的。</p>
+<p><em>This section describes how to search for algorithms and to insert and delete elements in a dictionary or symbol table. The Search operation returns the contents of the value associated with the desired key or failure if the key is not present. The Insert operation associates a specified key with a new value (inserting the key if it had not already been present). The Delete operation deletes the specified key. It is easy to support additional operations such as “find the minimum key” or “find the next key.”</em></p>
+<p>每个元素由一个节点表示，节点的层级在它被插入时随机地选择，选择的时候无需考虑数据结构中的元素数量。一个 $i$ 层节点有 $i$ 个前向指针（计数从 1 开始一直到 $i$）。我们不需要在节点中记录这个节点属于哪个层级，跳表的级别是表中所有节点的最大级别（如果跳表是空的，那么表的级别为 1），头节点中高于当前链表最大层级的指针指向 NIL （即尾结点，例如头节点有 10 个指针，当前跳表的级别为 6 ，那么头节点中的第 7 到 10 个指针都指向 NIL）。</p>
+<p><em>Each element is represented by a node, the level of which is chosen randomly when the node is inserted without regard for the number of elements in the data structure. A level $i$ node has $i$ forward pointers, indexed 1 through i. We do not need to store the level of a node in the node. Levels are capped at some appropriate con- stant MaxLevel. The level of a list is the maximum level currently in the list (or 1 if the list is empty). The header of a list has forward pointers at levels one through MaxLevel. The forward pointers of the header at levels higher than the current maximum level of the list point to NIL.</em></p>
+<h3 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h3><p>申请一个 NIL 节点，并对这个节点赋予一个比任何键都大的值。所有层级的所有跳表都以 NIL 节点作为结尾。一个新的链表被初始化成这个链表的层级是 1 ，并且链表中头节点的所有指针都指向 NIL 。</p>
+<p><em>An element NIL is allocated and given a key greater than any legal key. All levels of all skip lists are terminated with NIL. A new list is initialized so that the level of the list is equal to 1 and all forward pointers of the list’s header point to NIL.</em></p>
+<h3 id="搜索算法"><a href="#搜索算法" class="headerlink" title="搜索算法"></a>搜索算法</h3><p>我们通过遍历所有不超过包含待搜索元素的节点的前向指针来实现搜索（如图 2）。如果当前层级的指针无法搜索到更多的内容，那么就会进行到下一个层级。当我们在层级 1 也无法搜索到更多内容，如果包含待搜索键的节点存在，那我们必然在这个节点中。</p>
+<p><em>We search for an element by traversing forward pointers that do not overshoot the node containing the element being searched for (Figure 2). When no more progress can be made at the current level of forward pointers, the search moves down to the next level. When we can make no more progress at level 1, we must be immediately in front of the node that contains the desired element (if it is in the list).</em></p>
+<div style="font-size:13px; text-align:center; line-height: 0px">
+
+<img src="Figure2.png" srcset="/img/loading.gif" lazyload width=80%>
+
+<p><em>Figure 2</em></p>
+</div>
+
+<h3 id="插入和删除算法"><a href="#插入和删除算法" class="headerlink" title="插入和删除算法"></a>插入和删除算法</h3><div style="font-size:13px; text-align:center; line-height: 0px">
+
+<img src="Figure3.png" srcset="/img/loading.gif" lazyload>
+
+<p><em>Figure 3</em></p>
+</div>
+
+<p>如果要插入或者删除一个节点，我们只需要进行搜索和拼接（如图 3）。图 4 给出了插入和删除的算法。我们维护一个名为 <em>update</em> 的向量，以便当搜索完成时（并且我们已经准备好进行拼接了），<em>update[i]</em> 保存了一个指向一个层级大于等于 $i$ 的节点的指针，并且这个节点位于插入或删除节点所在位置的左半边的最右侧。如果一个插入产生了一个节点，其层级比原本链表中层级最高的节点还高，那么我们就更新链表的层级，并且初始化 <em>update</em> 向量合适的部分。在删除后，我们检查这次删除是否删掉了链表中层级最高的节点，如果是，那么就需要更新链表的层级。</p>
+<p><em>To insert or delete a node, we simply search and splice, as shown in Figure 3. Figure 4 gives algorithms for insertion and deletion. A vector update is maintained so that when the search is complete (and we are ready to perform the splice), update[i] contains a pointer to the rightmost node of level i or higher that is to the left of the location of the insertion&#x2F;deletion. If an insertion generates a node with a level greater than the previous maximum level of the list, we update the maximum level of the list and initialize the appropriate portions of the update vector. After each deletion, we check to see if we have deleted the maximum element of the list and if so, decrease the maximum level of the list.</em></p>
+<div style="font-size:13px; text-align:center; line-height: 0px">
+
+<img src="Figure4.png" srcset="/img/loading.gif" lazyload>
+
+<p><em>Figure 4</em></p>
+</div>
+
+<h3 id="选择随机层级"><a href="#选择随机层级" class="headerlink" title="选择随机层级"></a>选择随机层级</h3><p>最初，我们讨论了一个概率分布：一半具有 $i$ 层级指针的节点也有 $i+1$ 层级指针。为了避免魔法数，我们说在具有 $i$ 层级指针的节点中有比例 $p$ 的节点也拥有 $i+1$ 层级指针（我们最初假设 $p$&#x3D;1&#x2F;2 进行讨论）。层级是有和图 5 等效的算法随机生成的，并且在生成时无需考虑链表中元素的个数。</p>
+<p><em>Initially, we discussed a probability distribution where half of the nodes that have level i pointers also have level i + 1 pointers. To get away from magic constants, we say that a fraction p of the nodes with level i pointers also have level i + 1 pointers (see p &#x3D; 1&#x2F;2 for our original discussion). Levels are generated randomly by an algorithm equivalent to the one in Figure 5. Levels are generated without reference to the number of elements in the list.</em></p>
+<h3 id="我们在哪一个层级开始搜索？定义-L-n"><a href="#我们在哪一个层级开始搜索？定义-L-n" class="headerlink" title="我们在哪一个层级开始搜索？定义 $L(n)$"></a>我们在哪一个层级开始搜索？定义 $L(n)$</h3><p>在一个以 $p&#x3D;1&#x2F;2$ 生成的有 16 个元素的跳表中，可能有 9 个元素在层级 1 ，3 个元素在层级 2 ，3 个元素在层级 3 ，以及一个元素在层级 14（这发生的概率很小，但是还是有可能发生）。我们应该怎么处理它？如果我们使用标准算法从层级 14 开始搜索，那么就需要做很多无用功。那我们该从哪里开始搜索呢？我们的分析表明，理想情况下，我们应该从层级 L （期望有 $1&#x2F;p$  个节点）开始搜索，这在 $L &#x3D; \log_{1&#x2F;p} n$ 时成立。因为我们会经常引用这个式子，因此我们用 $L(n)$ 来代表 $\log_{1&#x2F;p} n$ 。</p>
+<p><em>In a skip list of 16 elements generated with p &#x3D; 1&#x2F;2, we might happen to have 9 elements of level 1; 3 elements of level 2; 3 elements of level 3; and 1 element of level 14 (this would be very unlikely, but it could happen). How should we handle this? If we use the standard algorithm and start our search at level 14, we will do a lot of useless work. Where should we start the search? Our analysis suggests that ideally we would start a search at the level L where we expect 1&#x2F;p nodes. This happens when $L &#x3D; \log_{1&#x2F;p} n$. Since we will be referring frequently to this formula, we will use L(n) to denote $\log_{1&#x2F;p} n$.</em> </p>
+<p>想要解决一个节点有异常大的层级这个问题有很多方法。别担心，我们只需要简单地从链表的最高层开始搜索即可。正如我们将在分析中所见，一个含有 n 个元素的链表中的节点的最高层级远高于 $L(n)$ 的概率是非常小的，从链表的最高层开始搜索只会对搜索的预期时间增加一个微小的常数。这种方法就是这篇论文中描述的算法所采用的方法。</p>
+<p><em>There are a number of solutions to the problem of deciding how to handle the case where there is an element with an unusually large level in the list. Don’t worry, be happy. Simply start a search at the highest level present in the list. As we will see in our analysis, the probability that the maximum level in a list of n elements is significantly larger than L(n) is very small. Starting a search at the maximum level in the list does not add more than a small constant to the expected search time. This is the approach used in the algorithms described in this paper.</em></p>
+<p>使用少于你获取的信息。尽管一个元素有可能包含 14 个指针的位置，我们不需要将这个 14 个都用完，我们可以选择仅使用 L(n) 层。有多种方法可以实现这一点，但它们都会使算法复杂化并且不会显着提高性能，因此不推荐使用这种方法。</p>
+<p><em>Use less than you are given. Although an element may contain room for 14 pointers, we do not need to use all 14. We can choose to utilize only L(n) levels. There are a number of ways to implement this, but they all complicate the algorithms and do not noticeably improve performance, so this approach is not recommended.</em></p>
+<p>固定随机数产生器。如果我们生成的随机层级比链表中的当前层级级别大一以上，我们只需使用列表中当前的最大层级加一作为新节点的层级。在实践中和直觉上，这种改变似乎运作良好。 然而，它完全破坏了我们分析结果算法的能力，因为节点的层级不再是完全随机的。 虽然程序员可能会实现这种方法，但纯粹主义者应该避免它。</p>
+<p><em>Fix the dice. If we generate a random level that is more than one greater than the current maximum level in the list, we simply use one plus the current maximum level in the list as the level of the new node. In practice and intuitively, this change seems to work well. However, it totally destroys our ability to analyze the resulting algorithms, since the level of a node is no longer completely random. Although programmers may implement this method, purists should avoid it.</em></p>
+<h3 id="选择最大层级"><a href="#选择最大层级" class="headerlink" title="选择最大层级"></a>选择最大层级</h3><p>由于可以在 L(n) 处限制层级的最大值，因此我们应该选择 MaxLevel &#x3D; L(N)（其中 N 是跳表中元素数量的上限）。如果 p &#x3D; 1&#x2F;2，那么使用 MaxLevel &#x3D; 16 适用于最多包含 $2^{16}$ 个元素的数据结构。</p>
+<p><em>Since we can safely cap levels at L(n), we should choose MaxLevel &#x3D; L(N) (where N is an upper bound on the number of elements in a skip list). If p &#x3D; 1&#x2F;2, using MaxLevel &#x3D; 16 is appropriate for data structures con taining up to $2^{16}$ elements.</em></p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/" class="category-chain-item">论文笔记</a>
+  
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>跳表：平衡树的概率替代方案</div>
+      <div>https://thumarklau.github.io/2021/07/13/SkipList/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2021年7月13日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="SA - 相同方式共享">
+                    <i class="iconfont icon-sa"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/07/15/leveldb-source-code-reading-4/" title="LevelDB 源代码阅读（四）：MemTable">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">LevelDB 源代码阅读（四）：MemTable</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/07/11/leveldb-source-code-reading-3/" title="LevelDB 源代码阅读（三）：预写日志">
+                        <span class="hidden-mobile">LevelDB 源代码阅读（三）：预写日志</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  
+      <script>
+        if (!window.MathJax) {
+          window.MathJax = {
+            tex    : {
+              inlineMath: { '[+]': [['$', '$']] }
+            },
+            loader : {
+              load: ['ui/lazy']
+            },
+            options: {
+              renderActions: {
+                insertedScript: [200, () => {
+                  document.querySelectorAll('mjx-container').forEach(node => {
+                    let target = node.parentNode;
+                    if (target.nodeName.toLowerCase() === 'li') {
+                      target.parentNode.classList.add('has-jax');
+                    }
+                  });
+                }, '', false]
+              }
+            }
+          };
+        } else {
+          MathJax.startup.document.state(0);
+          MathJax.texReset();
+          MathJax.typeset();
+          MathJax.typesetPromise();
+        }
+
+        Fluid.events.registerRefreshCallback(function() {
+          if ('MathJax' in window && MathJax.startup.document && typeof MathJax.startup.document.state === 'function') {
+            MathJax.startup.document.state(0);
+            MathJax.texReset();
+            MathJax.typeset();
+            MathJax.typesetPromise();
+          }
+        });
+      </script>
+    
+
+  <script  src="https://lib.baomitu.com/mathjax/3.2.2/es5/tex-mml-chtml.js" ></script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

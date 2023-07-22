@@ -1,0 +1,832 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="在前面两篇文章中，我们介绍了 LevelDB 的写流程和读流程。原本准备这篇文章介绍 LevelDB 的 MemTable 结构，但是在 LevelDB Handbook 的内容编排中，MemTable 被放在了预写日志之后介绍。于是我也决定按照 Handbook 的顺序，先介绍预写日志，再介绍 MemTable 的结构。 WAL：预写日志WAL 的英文全称为 Write-Ahead Log ，翻">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB 源代码阅读（三）：预写日志">
+<meta property="og:url" content="https://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="在前面两篇文章中，我们介绍了 LevelDB 的写流程和读流程。原本准备这篇文章介绍 LevelDB 的 MemTable 结构，但是在 LevelDB Handbook 的内容编排中，MemTable 被放在了预写日志之后介绍。于是我也决定按照 Handbook 的顺序，先介绍预写日志，再介绍 MemTable 的结构。 WAL：预写日志WAL 的英文全称为 Write-Ahead Log ，翻">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/LSM.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/Leveldb-WAL.png">
+<meta property="article:published_time" content="2021-07-11T08:10:06.000Z">
+<meta property="article:modified_time" content="2023-07-19T13:57:08.383Z">
+<meta property="article:author" content="MarkLau">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/LSM.png">
+  
+  
+  
+  <title>LevelDB 源代码阅读（三）：预写日志 - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"thumarklau.github.io","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="LevelDB 源代码阅读（三）：预写日志"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2021-07-11 16:10" pubdate>
+          2021年7月11日 下午
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          14k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          117 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">LevelDB 源代码阅读（三）：预写日志</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>在前面两篇文章中，我们介绍了 LevelDB 的写流程和读流程。原本准备这篇文章介绍 LevelDB 的 MemTable 结构，但是在 <a target="_blank" rel="noopener" href="https://leveldb-handbook.readthedocs.io/zh/latest/index.html">LevelDB Handbook</a> 的内容编排中，MemTable 被放在了预写日志之后介绍。于是我也决定按照 Handbook 的顺序，先介绍预写日志，再介绍 MemTable 的结构。</p>
+<h1 id="WAL：预写日志"><a href="#WAL：预写日志" class="headerlink" title="WAL：预写日志"></a>WAL：预写日志</h1><p>WAL 的英文全称为 Write-Ahead Log ，翻译过来就是预写日志。所谓预写，就是在正式地执行对数据的写操作前（插入或者删除），先将操作的内容通过日志记录下来，这么做的目的是为了防止因进程异常或者服务器异常导致的数据库异常。</p>
+<img src="LSM.png" srcset="/img/loading.gif" lazyload width=65%>
+
+<p>我们考虑下面两种情况：</p>
+<ul>
+<li>日志未写完或者未开始写进程就异常退出</li>
+<li>日志写完了，数据没写完或者没开始写进程异常退出</li>
+<li>日志写完了，数据也写完了，进程异常退出</li>
+</ul>
+<p>第一种情况下，在数据库恢复时会看到一条不完整的日志（写到一半）或者看不到该条日志（没开始写），这种情况下可以认为这次写操作失败，数据库也不会恢复这次操作，保证了写操作的原子性。</p>
+<p>第二种情况下，数据库在恢复时可以通过读取到的日志内容来恢复未完成的写操作，同样保证了原子性。</p>
+<p>第三种情况就是正常的情况，数据库在恢复时无须进行任何操作。</p>
+<p>因此，WAL 在这三种情况下都可以保证数据库写操作的原子性。对于 WAL 的更多知识，可以查看这篇<a target="_blank" rel="noopener" href="https://martinfowler.com/articles/patterns-of-distributed-systems/wal.html">文章</a>。下面我们看看 WAL 在 LevelDB 中是如何实现的。</p>
+<h1 id="LevelDB-中的-WAL-实现"><a href="#LevelDB-中的-WAL-实现" class="headerlink" title="LevelDB 中的 WAL 实现"></a>LevelDB 中的 WAL 实现</h1><h2 id="LevelDB-的日志结构"><a href="#LevelDB-的日志结构" class="headerlink" title="LevelDB 的日志结构"></a>LevelDB 的日志结构</h2><img src="Leveldb-WAL.png" srcset="/img/loading.gif" lazyload width=80%>
+
+<p>上图是 LevelDB 中日志的结构。日志被存储的最小单位是 Chunk，一个 Chunk 包含了四个部分：校验和 Checksum（4 个字节）、数据长度 Length （2 个字节），Chunk 类型 Type（1 个字节）以及数据内容，前三个部分被称为 ChunkHeader 。校验和是由数据类型以及数据内容计算出来的，使用的算法是 CRC 校验算法。Chunk 类型一共有 4 种：Full、First、Midlle、Last 。之所以需要有四种 Chunk 类型，是因为一条日志有可能因为大小太大而被存在多个 Chunk 当中。假如一条日志被存放在了一个 Chunk 当中，那么这个 Chunk 的类型就是 Full ；假如一条日志被存放在了多个 Chunk 当中，那么第一个 Chunk 的类型为 First ，最后一个 Chunk 的类型为 Last ，First 和 Last 之间包含了零个或多个 Middle 类型的 Chunk ，这些所有的 Chunk 中的数据组合起来就是日志的原始数据。</p>
+<p>一个或多个 Chunk 会组成一个 Block 。一个 Block 是有大小限制的，上限是 32 KB，即 32768 个字节。当一个 Block 的大小达到了阈值后，这个 Block 就会被关闭，然后开启一个新的 Block 。如果我们往一个 Block 中写日志时，Block 中剩余的空间足够写下一个 ChunkHeader， 但无法容下这条日志的所有内容，那么就会写入一个类型为 First 的 Chunk，然后开启一个新的 Block ，将剩余的数据写在新 Block 中。我们可以推理出，假如一个 Chunk 的类型为 Middle，那么这个 Chunk 一定占据了一整个 Block （想想这是为什么）。</p>
+<h2 id="写日志"><a href="#写日志" class="headerlink" title="写日志"></a>写日志</h2><p>LevelDB 中所有的写操作都会在 <code>DBImpl::Write</code> 函数中被处理，这当中也包含了对 WAL 的处理，代码如下</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// db_impl.cc</span><br><span class="hljs-function">Status <span class="hljs-title">DBImpl::Write</span><span class="hljs-params">(<span class="hljs-type">const</span> WriteOptions&amp; options, WriteBatch* updates)</span> </span>&#123;<br>  ... <span class="hljs-comment">// some code prepare for writing</span><br>  <span class="hljs-comment">// Write WAL</span><br>  status = log_-&gt;<span class="hljs-built_in">AddRecord</span>(WriteBatchInternal::<span class="hljs-built_in">Contents</span>(write_batch));<br>  <span class="hljs-type">bool</span> sync_error = <span class="hljs-literal">false</span>;<br>  <span class="hljs-keyword">if</span> (status.<span class="hljs-built_in">ok</span>() &amp;&amp; options.sync) &#123;<br>    status = logfile_-&gt;<span class="hljs-built_in">Sync</span>();<br>    <span class="hljs-keyword">if</span> (!status.<span class="hljs-built_in">ok</span>()) &#123;<br>      sync_error = <span class="hljs-literal">true</span>;<br>    &#125;<br>  &#125;<br>  <span class="hljs-keyword">if</span> (status.<span class="hljs-built_in">ok</span>()) &#123;<br>    <span class="hljs-comment">// insert the data to the memtable</span><br>    status = WriteBatchInternal::<span class="hljs-built_in">InsertInto</span>(write_batch, mem_);<br>  &#125;<br><br>  ... <span class="hljs-comment">// some code after write</span><br><br>  <span class="hljs-keyword">return</span> status;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>可以看到，WAL 确实是在正式写数据之前完成的。 <code>WriteBatchInternal::Contents</code> 函数会将 WriteBatch 中的 rep_ 包装成 <em>Slice</em> 对象（关于 WriteBatch 和 Slice 的介绍，可以参考前面介绍 LevelDB 写流程的文章），然后传入 Writer 的 <code>AddRecord</code> 函数中。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// log_writer.cc</span><br><span class="hljs-function">Status <span class="hljs-title">Writer::AddRecord</span><span class="hljs-params">(<span class="hljs-type">const</span> Slice&amp; slice)</span> </span>&#123;<br>	<span class="hljs-comment">// the data and length of the log</span><br>  <span class="hljs-type">const</span> <span class="hljs-type">char</span>* ptr = slice.<span class="hljs-built_in">data</span>();<br>  <span class="hljs-type">size_t</span> left = slice.<span class="hljs-built_in">size</span>();<br><br>  <span class="hljs-comment">// Fragment the record if necessary and emit it.  Note that if slice</span><br>  <span class="hljs-comment">// is empty, we still want to iterate once to emit a single</span><br>  <span class="hljs-comment">// zero-length record</span><br>  Status s;<br>  <span class="hljs-type">bool</span> begin = <span class="hljs-literal">true</span>;<br>  <span class="hljs-keyword">do</span> &#123;<br>    <span class="hljs-comment">// ------------ Begin of Code Fragment A -------------</span><br>  	<span class="hljs-comment">// the left size of current block</span><br>    <span class="hljs-type">const</span> <span class="hljs-type">int</span> leftover = kBlockSize - block_offset_;<br>    <span class="hljs-built_in">assert</span>(leftover &gt;= <span class="hljs-number">0</span>);<br>    <span class="hljs-keyword">if</span> (leftover &lt; kHeaderSize) &#123;<br>			<span class="hljs-comment">// If the left space cannot write a chunk header</span><br>      <span class="hljs-comment">// Switch to a new block</span><br>      <span class="hljs-keyword">if</span> (leftover &gt; <span class="hljs-number">0</span>) &#123;<br>        <span class="hljs-comment">// Fill the trailer (literal below relies on kHeaderSize being 7)</span><br>        <span class="hljs-built_in">static_assert</span>(kHeaderSize == <span class="hljs-number">7</span>, <span class="hljs-string">&quot;&quot;</span>);<br>        dest_-&gt;<span class="hljs-built_in">Append</span>(<span class="hljs-built_in">Slice</span>(<span class="hljs-string">&quot;\x00\x00\x00\x00\x00\x00&quot;</span>, leftover));<br>      &#125;<br>      <span class="hljs-comment">// when switching to a new block, just set the offset in the block to 0</span><br>      block_offset_ = <span class="hljs-number">0</span>;<br>    &#125;<br>    <span class="hljs-comment">// ------------ End of Code Fragment A -------------</span><br><br>    <span class="hljs-comment">// ------------ Begin of Code Fragment B -------------</span><br>    <span class="hljs-comment">// Invariant: we never leave &lt; kHeaderSize bytes in a block.</span><br>    <span class="hljs-built_in">assert</span>(kBlockSize - block_offset_ - kHeaderSize &gt;= <span class="hljs-number">0</span>);<br><br>    <span class="hljs-comment">// the size of space used for writing data</span><br>    <span class="hljs-type">const</span> <span class="hljs-type">size_t</span> avail = kBlockSize - block_offset_ - kHeaderSize;<br>    <span class="hljs-comment">// if the fragment_length == left, current log can be completely written into this block</span><br>    <span class="hljs-comment">// else current log should be divided into several fragment</span><br>    <span class="hljs-type">const</span> <span class="hljs-type">size_t</span> fragment_length = (left &lt; avail) ? left : avail;<br><br>    RecordType type;<br>    <span class="hljs-type">const</span> <span class="hljs-type">bool</span> end = (left == fragment_length);<br>    <span class="hljs-keyword">if</span> (begin &amp;&amp; end) &#123;<br>      type = kFullType;<br>    &#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (begin) &#123;<br>      type = kFirstType;<br>    &#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (end) &#123;<br>      type = kLastType;<br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>      type = kMiddleType;<br>    &#125;<br>    <span class="hljs-comment">// ------------ End of Code Fragment B -------------</span><br><br>    <span class="hljs-comment">// ------------ Begin of Code Fragment C -------------</span><br>    <span class="hljs-comment">// write current chunk to disk</span><br>    s = <span class="hljs-built_in">EmitPhysicalRecord</span>(type, ptr, fragment_length);<br>    ptr += fragment_length;<br>    left -= fragment_length;<br>    begin = <span class="hljs-literal">false</span>;<br>    <span class="hljs-comment">// ------------ End of Code Fragment C -------------</span><br>  &#125; <span class="hljs-keyword">while</span> (s.<span class="hljs-built_in">ok</span>() &amp;&amp; left &gt; <span class="hljs-number">0</span>);<br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这段代码还是比较清晰的，A 段代码主要是在检查当前 Block 剩余空间大小：如果当前 Block 剩余的空间小于一个 ChunkHeader 的大小，那么就会把 Block 剩下的空间用 0 填满，然后切换到一个新的 Block 中。这里切换新 Block 的操作非常简单，就是将记录当前数据 offset 的变量置为 0 。 B 段代码则是在检查当前这条日志的写入情况：如果 Block 剩余的空间大小可以将这条日志写完，那么新加入的 Chunk 类型就为 Full ；否则一条日志可能要写在多个 Chunk 中，那么就根据当前写的情况将 Chunk 标志为 First、Middle 或者 Last 。C 段代码则是调用函数将当前这条 Chunk 提交并写入到磁盘中。值得注意的是，假如我们当前日志的内容为空，即变量 left 一开始就为 0，那么这段代码仍然会提交一个 data 段为空的 Chunk 。</p>
+<p>下面我们来看看一个 Chunk 是如何被提交的。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// log_writer.cc</span><br><span class="hljs-function">Status <span class="hljs-title">Writer::EmitPhysicalRecord</span><span class="hljs-params">(RecordType t, <span class="hljs-type">const</span> <span class="hljs-type">char</span>* ptr,</span></span><br><span class="hljs-params"><span class="hljs-function">                                  <span class="hljs-type">size_t</span> length)</span> </span>&#123;<br>  <span class="hljs-built_in">assert</span>(length &lt;= <span class="hljs-number">0xffff</span>);  <span class="hljs-comment">// Must fit in two bytes</span><br>  <span class="hljs-built_in">assert</span>(block_offset_ + kHeaderSize + length &lt;= kBlockSize);<br><br>  <span class="hljs-comment">// Format the header</span><br>  <span class="hljs-comment">// The structure of Header</span><br>  <span class="hljs-comment">// CheckSum     4 Byte</span><br>  <span class="hljs-comment">// DataLength   2 Byte</span><br>  <span class="hljs-comment">// ChunkType    1 Byte</span><br>  <span class="hljs-type">char</span> buf[kHeaderSize];<br>	<span class="hljs-comment">// ------------ Start of Code Fragment A -------------</span><br>  <span class="hljs-comment">// Encode the DataLength</span><br>  buf[<span class="hljs-number">4</span>] = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">char</span>&gt;(length &amp; <span class="hljs-number">0xff</span>);<br>  buf[<span class="hljs-number">5</span>] = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">char</span>&gt;(length &gt;&gt; <span class="hljs-number">8</span>);<br>  <span class="hljs-comment">// Encode the ChunkType</span><br>  buf[<span class="hljs-number">6</span>] = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">char</span>&gt;(t);<br><br>  <span class="hljs-comment">// Compute the crc of the record type and the payload.</span><br>  <span class="hljs-type">uint32_t</span> crc = crc32c::<span class="hljs-built_in">Extend</span>(type_crc_[t], ptr, length);<br>  crc = crc32c::<span class="hljs-built_in">Mask</span>(crc);  <span class="hljs-comment">// Adjust for storage</span><br>  <span class="hljs-built_in">EncodeFixed32</span>(buf, crc);<br>	<span class="hljs-comment">// ------------ End of Code Fragment A -------------</span><br><br>	<span class="hljs-comment">// ------------ Start of Code Fragment B -------------</span><br>  <span class="hljs-comment">// Write the header and the payload</span><br>  Status s = dest_-&gt;<span class="hljs-built_in">Append</span>(<span class="hljs-built_in">Slice</span>(buf, kHeaderSize));<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    s = dest_-&gt;<span class="hljs-built_in">Append</span>(<span class="hljs-built_in">Slice</span>(ptr, length));<br>    <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    	<span class="hljs-comment">// flush the chunk to disk</span><br>      s = dest_-&gt;<span class="hljs-built_in">Flush</span>();<br>    &#125;<br>  &#125;<br>	<span class="hljs-comment">// ------------ End of Code Fragment B -------------</span><br>  block_offset_ += kHeaderSize + length;<br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这一段代码分为两个部分：A 部分代码编码了 ChunkHeader ，我们可以看到校验和是通过 <code>crc32c::Extend</code> 和 <code>crc32c::Mask</code> 方法计算得到的，然后它们和 DataLength、 ChunkType 一起被编码进了 buf 中。B 部分将 ChunkHeader 和 Data 分别添加到了 dest_ 中。这里的 dest_ 是一个 <em>WritableFile</em> 对象，其 <code>Append</code> 的方法并不会将数据刷到文件中，而是保存在一个缓冲区中。当 Chunk Header 以及 Data 部分的数据都成功添加到了 dest_ 中后，就会调用其 <code>Flush</code> 方法，这个方法会将其缓冲区中的 Chunk 刷到磁盘上。有一点需要注意的是，在不同的操作系统下，dest_ 的具体类型会不同。<em>WritableFile</em> 是一个抽象类，在 Windows 下其实现为 <em>WindowsWritableFile</em>；在 Mac 和 Linux 系统下，其实现是 <code>PosixWritableFile</code> 。它们的区别在于写入数据时调用的系统调用不一样，编译时编译器会根据操作系统的信息来选择不同的实现。</p>
+<h1 id="读日志"><a href="#读日志" class="headerlink" title="读日志"></a>读日志</h1><p>当系统在恢复时，需要读取硬盘上的日志然后恢复之前由于进程异常退出丢失的操作。下面我们来讲讲 LevelDB 是如何读取日志的。在前面写入日志时，代码都是中 log_writer.cc 中的。对应的，在读取日志时，也有一个 log_reader.cc 中的 <em>Reader</em> 类负责将日志读出并解析。在这个类中有一个函数 <code>ReadRecord</code> 直接读取下一条日志并返回，下面我们看看这个函数的内容</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// log_reader.cc</span><br><span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Reader::ReadRecord</span><span class="hljs-params">(Slice* record, std::string* scratch)</span> </span>&#123;<br>  <span class="hljs-comment">// ------------ Start of Code Fragment A -------------</span><br>  <span class="hljs-comment">// 如果 last_record_offset_ 小于 initial_offset_</span><br>  <span class="hljs-comment">// 那么 initial_offset 大于 0，并且第一个 chunk 还没有被读取</span><br>  <span class="hljs-comment">// 所以直接跳转到第一个 chunk 开始的位置</span><br>  <span class="hljs-keyword">if</span> (last_record_offset_ &lt; initial_offset_) &#123;<br>    <span class="hljs-keyword">if</span> (!<span class="hljs-built_in">SkipToInitialBlock</span>()) &#123;<br>      <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;<br>    &#125;<br>  &#125;<br><br>  <span class="hljs-comment">// scratch 用于缓存一条日志的数据</span><br>  scratch-&gt;<span class="hljs-built_in">clear</span>();<br>  record-&gt;<span class="hljs-built_in">clear</span>();<br>  <span class="hljs-type">bool</span> in_fragmented_record = <span class="hljs-literal">false</span>;<br>  <span class="hljs-comment">// Record offset of the logical record that we&#x27;re reading</span><br>  <span class="hljs-comment">// 0 is a dummy value to make compilers happy</span><br>  <span class="hljs-comment">// 记录当前正在读的这条日志在文件中的 offset</span><br>  <span class="hljs-type">uint64_t</span> prospective_record_offset = <span class="hljs-number">0</span>;<br><br>  Slice fragment;<br>  <span class="hljs-comment">// ------------ End of Code Fragment A -------------</span><br><br><br>  <span class="hljs-comment">// ------------ Start of Code Fragment B -------------</span><br>  <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) &#123;<br>    <span class="hljs-type">const</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> record_type = <span class="hljs-built_in">ReadPhysicalRecord</span>(&amp;fragment);<br><br>    <span class="hljs-comment">// ReadPhysicalRecord may have only had an empty trailer remaining in its</span><br>    <span class="hljs-comment">// internal buffer. Calculate the offset of the next physical record now</span><br>    <span class="hljs-comment">// that it has returned, properly accounting for its header size.</span><br>    <span class="hljs-comment">// physical_record_offset 就是当前读出来的这个 chunk 在文件中开始的位置</span><br>    <span class="hljs-type">uint64_t</span> physical_record_offset =<br>        end_of_buffer_offset_ - buffer_.<span class="hljs-built_in">size</span>() - kHeaderSize - fragment.<span class="hljs-built_in">size</span>();<br><br>    <span class="hljs-keyword">if</span> (resyncing_) &#123;<br>      <span class="hljs-keyword">if</span> (record_type == kMiddleType) &#123;<br>        <span class="hljs-keyword">continue</span>;<br>      &#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (record_type == kLastType) &#123;<br>        resyncing_ = <span class="hljs-literal">false</span>;<br>        <span class="hljs-keyword">continue</span>;<br>      &#125; <span class="hljs-keyword">else</span> &#123;<br>        resyncing_ = <span class="hljs-literal">false</span>;<br>      &#125;<br>    &#125;<br><br>    <span class="hljs-keyword">switch</span> (record_type) &#123;<br>      <span class="hljs-keyword">case</span> kFullType:<br>        <span class="hljs-comment">// 如果读到了 FullType 的 Chunk,那么就已经读到了一整条日志，直接返回</span><br>        <span class="hljs-keyword">if</span> (in_fragmented_record) &#123;<br>          <span class="hljs-comment">// Handle bug in earlier versions of log::Writer where</span><br>          <span class="hljs-comment">// it could emit an empty kFirstType record at the tail end</span><br>          <span class="hljs-comment">// of a block followed by a kFullType or kFirstType record</span><br>          <span class="hljs-comment">// at the beginning of the next block.</span><br>          <span class="hljs-keyword">if</span> (!scratch-&gt;<span class="hljs-built_in">empty</span>()) &#123;<br>            <span class="hljs-built_in">ReportCorruption</span>(scratch-&gt;<span class="hljs-built_in">size</span>(), <span class="hljs-string">&quot;partial record without end(1)&quot;</span>);<br>          &#125;<br>        &#125;<br>        prospective_record_offset = physical_record_offset;<br>        scratch-&gt;<span class="hljs-built_in">clear</span>();<br>        *record = fragment;<br>        last_record_offset_ = prospective_record_offset;<br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;<br><br>      <span class="hljs-keyword">case</span> kFirstType:<br>        <span class="hljs-comment">// 如果读到了 firstType 的 Chunk,那么就要将 in_fragmented_record 置为 true</span><br>        <span class="hljs-comment">// 然后继续往下读，直到读到了一条 Last 类型的 chunk</span><br>        <span class="hljs-keyword">if</span> (in_fragmented_record) &#123;<br>          <span class="hljs-comment">// Handle bug in earlier versions of log::Writer where</span><br>          <span class="hljs-comment">// it could emit an empty kFirstType record at the tail end</span><br>          <span class="hljs-comment">// of a block followed by a kFullType or kFirstType record</span><br>          <span class="hljs-comment">// at the beginning of the next block.</span><br>          <span class="hljs-keyword">if</span> (!scratch-&gt;<span class="hljs-built_in">empty</span>()) &#123;<br>            <span class="hljs-built_in">ReportCorruption</span>(scratch-&gt;<span class="hljs-built_in">size</span>(), <span class="hljs-string">&quot;partial record without end(2)&quot;</span>);<br>          &#125;<br>        &#125;<br>        prospective_record_offset = physical_record_offset;<br>        scratch-&gt;<span class="hljs-built_in">assign</span>(fragment.<span class="hljs-built_in">data</span>(), fragment.<span class="hljs-built_in">size</span>());<br>        in_fragmented_record = <span class="hljs-literal">true</span>;<br>        <span class="hljs-keyword">break</span>;<br><br>      <span class="hljs-keyword">case</span> kMiddleType:<br>        <span class="hljs-comment">// 如果读到了 Middle 类型的 Chunk,将内容添加进 scratch 中，然后接着往下读</span><br>        <span class="hljs-comment">// 直到读到了一条 Last 类型的 Chunk</span><br>        <span class="hljs-keyword">if</span> (!in_fragmented_record) &#123;<br>          <span class="hljs-built_in">ReportCorruption</span>(fragment.<span class="hljs-built_in">size</span>(),<br>                           <span class="hljs-string">&quot;missing start of fragmented record(1)&quot;</span>);<br>        &#125; <span class="hljs-keyword">else</span> &#123;<br>          scratch-&gt;<span class="hljs-built_in">append</span>(fragment.<span class="hljs-built_in">data</span>(), fragment.<span class="hljs-built_in">size</span>());<br>        &#125;<br>        <span class="hljs-keyword">break</span>;<br><br>      <span class="hljs-keyword">case</span> kLastType:<br>        <span class="hljs-comment">// 读到了一条 Last 类型的日志，将这条日志的内容以及前面缓存的日志一起拼接起来</span><br>        <span class="hljs-comment">// 形成一条完整的日志并且返回</span><br>        <span class="hljs-keyword">if</span> (!in_fragmented_record) &#123;<br>          <span class="hljs-built_in">ReportCorruption</span>(fragment.<span class="hljs-built_in">size</span>(),<br>                           <span class="hljs-string">&quot;missing start of fragmented record(2)&quot;</span>);<br>        &#125; <span class="hljs-keyword">else</span> &#123;<br>          scratch-&gt;<span class="hljs-built_in">append</span>(fragment.<span class="hljs-built_in">data</span>(), fragment.<span class="hljs-built_in">size</span>());<br>          *record = <span class="hljs-built_in">Slice</span>(*scratch);<br>          last_record_offset_ = prospective_record_offset;<br>          <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;<br>        &#125;<br>        <span class="hljs-keyword">break</span>;<br><br>      <span class="hljs-keyword">case</span> kEof:<br>        <span class="hljs-keyword">if</span> (in_fragmented_record) &#123;<br>          <span class="hljs-comment">// This can be caused by the writer dying immediately after</span><br>          <span class="hljs-comment">// writing a physical record but before completing the next; don&#x27;t// scratch 用于缓存一条日志的数据</span><br>          <span class="hljs-comment">// treat it as a corruption, just ignore the entire logical record.</span><br>          scratch-&gt;<span class="hljs-built_in">clear</span>();<br>        &#125;<br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;<br><br>      <span class="hljs-keyword">case</span> kBadRecord:<br>        <span class="hljs-keyword">if</span> (in_fragmented_record) &#123;<br>          <span class="hljs-built_in">ReportCorruption</span>(scratch-&gt;<span class="hljs-built_in">size</span>(), <span class="hljs-string">&quot;error in middle of record&quot;</span>);<br>          in_fragmented_record = <span class="hljs-literal">false</span>;<br>          scratch-&gt;<span class="hljs-built_in">clear</span>();<br>        &#125;<br>        <span class="hljs-keyword">break</span>;<br><br>      <span class="hljs-keyword">default</span>: &#123;<br>        <span class="hljs-type">char</span> buf[<span class="hljs-number">40</span>];<br>        std::<span class="hljs-built_in">snprintf</span>(buf, <span class="hljs-built_in">sizeof</span>(buf), <span class="hljs-string">&quot;unknown record type %u&quot;</span>, record_type);<br>        <span class="hljs-built_in">ReportCorruption</span>(<br>            (fragment.<span class="hljs-built_in">size</span>() + (in_fragmented_record ? scratch-&gt;<span class="hljs-built_in">size</span>() : <span class="hljs-number">0</span>)),<br>            buf);<br>        in_fragmented_record = <span class="hljs-literal">false</span>;<br>        scratch-&gt;<span class="hljs-built_in">clear</span>();<br>        <span class="hljs-keyword">break</span>;<br>      &#125;<br>    &#125;<br>  &#125;<br>  <span class="hljs-comment">// ------------ End of Code Fragment B -------------</span><br>  <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这个函数中主要分为两个部分，A 部分的代码主要是一些准备工作，例如将文件的 offset 移动到第一个 Chunk 的起始位置，清空缓冲区等；B 部分代码的工作是不断地读出下一个 Chunk 的内容，根据这个 Chunk 的类型来判断是否需要继续读下一个 Chunk（读到了 First 类型或者 Middle 类型的 Chunk）,如果一条日志的内容读取完了（读到了 Full 类型或者 Last 类型的 Chunk），就将缓冲区中的数据组装成一个 <em>Slice</em> 对象返回，这个对象中的内容就是一条逻辑日志的完整内容。</p>
+<p>读取下一个 Chunk 的执行逻辑主要在 <code>ReadPhysicalRecord</code> 函数中，它的内容如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// log_reader.cc</span><br><span class="hljs-comment">// 从 buffer 中读取一个 Chunk，返回这个 chunk 的类型</span><br><span class="hljs-comment">// 如果当前 buffer 已经读完，则会从文件中读取下一个 Block 的内容到 buffer 中</span><br><span class="hljs-comment">// 如果文件的内容也被读完了，则返回 eof</span><br><span class="hljs-function"><span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> <span class="hljs-title">Reader::ReadPhysicalRecord</span><span class="hljs-params">(Slice* result)</span> </span>&#123;<br>  <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) &#123;<br>    <span class="hljs-comment">// ------------ Start of Code Fragment A -------------</span><br>    <span class="hljs-comment">// 如果 buffer 中剩余的数据大小小于一个 ChunkHeader 的大小</span><br>    <span class="hljs-comment">// 则说明剩下的都是 trailer，直接跳到下一个 Block</span><br>    <span class="hljs-keyword">if</span> (buffer_.<span class="hljs-built_in">size</span>() &lt; kHeaderSize) &#123;<br>      <span class="hljs-keyword">if</span> (!eof_) &#123;<br>        <span class="hljs-comment">// Last read was a full read, so this is a trailer to skip</span><br>        buffer_.<span class="hljs-built_in">clear</span>();<br>        <span class="hljs-comment">// 读取下一个 Block</span><br>        Status status = file_-&gt;<span class="hljs-built_in">Read</span>(kBlockSize, &amp;buffer_, backing_store_);<br>        end_of_buffer_offset_ += buffer_.<span class="hljs-built_in">size</span>();<br>        <span class="hljs-keyword">if</span> (!status.<span class="hljs-built_in">ok</span>()) &#123;<br>          buffer_.<span class="hljs-built_in">clear</span>();<br>          <span class="hljs-built_in">ReportDrop</span>(kBlockSize, status);<br>          eof_ = <span class="hljs-literal">true</span>;<br>          <span class="hljs-keyword">return</span> kEof;<br>        &#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (buffer_.<span class="hljs-built_in">size</span>() &lt; kBlockSize) &#123;<br>          eof_ = <span class="hljs-literal">true</span>;<br>        &#125;<br>        <span class="hljs-keyword">continue</span>;<br>      &#125; <span class="hljs-keyword">else</span> &#123;<br>        <span class="hljs-comment">// Note that if buffer_ is non-empty, we have a truncated header at the</span><br>        <span class="hljs-comment">// end of the file, which can be caused by the writer crashing in the</span><br>        <span class="hljs-comment">// middle of writing the header. Instead of considering this an error,</span><br>        <span class="hljs-comment">// just report EOF.</span><br>        buffer_.<span class="hljs-built_in">clear</span>();<br>        <span class="hljs-keyword">return</span> kEof;<br>      &#125;<br>    &#125;<br>    <span class="hljs-comment">// ------------ End of Code Fragment A -------------</span><br><br>    <span class="hljs-comment">// ------------ Start of Code Fragment B -------------</span><br>    <span class="hljs-comment">// Parse the header</span><br>    <span class="hljs-comment">// 获取当前 Chunk 的 type 和 data length</span><br>    <span class="hljs-type">const</span> <span class="hljs-type">char</span>* header = buffer_.<span class="hljs-built_in">data</span>();<br>    <span class="hljs-type">const</span> <span class="hljs-type">uint32_t</span> a = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">uint32_t</span>&gt;(header[<span class="hljs-number">4</span>]) &amp; <span class="hljs-number">0xff</span>;<br>    <span class="hljs-type">const</span> <span class="hljs-type">uint32_t</span> b = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">uint32_t</span>&gt;(header[<span class="hljs-number">5</span>]) &amp; <span class="hljs-number">0xff</span>;<br>    <span class="hljs-type">const</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> type = header[<span class="hljs-number">6</span>];<br>    <span class="hljs-type">const</span> <span class="hljs-type">uint32_t</span> length = a | (b &lt;&lt; <span class="hljs-number">8</span>);<br><br>    <span class="hljs-comment">// 如果 Header 的大小加上数据部分的大小比 buffer 中数据的大小还大</span><br>    <span class="hljs-comment">// 说明数据的读取发生了异常，报告异常并返回</span><br>    <span class="hljs-keyword">if</span> (kHeaderSize + length &gt; buffer_.<span class="hljs-built_in">size</span>()) &#123;<br>      <span class="hljs-type">size_t</span> drop_size = buffer_.<span class="hljs-built_in">size</span>();<br>      buffer_.<span class="hljs-built_in">clear</span>();<br>      <span class="hljs-keyword">if</span> (!eof_) &#123;<br>        <span class="hljs-built_in">ReportCorruption</span>(drop_size, <span class="hljs-string">&quot;bad record length&quot;</span>);<br>        <span class="hljs-keyword">return</span> kBadRecord;<br>      &#125;<br>      <span class="hljs-comment">// If the end of the file has been reached without reading |length| bytes</span><br>      <span class="hljs-comment">// of payload, assume the writer died in the middle of writing the record.</span><br>      <span class="hljs-comment">// Don&#x27;t report a corruption.</span><br>      <span class="hljs-keyword">return</span> kEof;<br>    &#125;<br><br>    <span class="hljs-keyword">if</span> (type == kZeroType &amp;&amp; length == <span class="hljs-number">0</span>) &#123;<br>      <span class="hljs-comment">// Skip zero length record without reporting any drops since</span><br>      <span class="hljs-comment">// such records are produced by the mmap based writing code in</span><br>      <span class="hljs-comment">// env_posix.cc that preallocates file regions.</span><br>      buffer_.<span class="hljs-built_in">clear</span>();<br>      <span class="hljs-keyword">return</span> kBadRecord;<br>    &#125;<br><br>    <span class="hljs-comment">// Check crc</span><br>    <span class="hljs-comment">// 检查校验和，如果校验和不对，那么也报告异常</span><br>    <span class="hljs-keyword">if</span> (checksum_) &#123;<br>      <span class="hljs-type">uint32_t</span> expected_crc = crc32c::<span class="hljs-built_in">Unmask</span>(<span class="hljs-built_in">DecodeFixed32</span>(header));<br>      <span class="hljs-type">uint32_t</span> actual_crc = crc32c::<span class="hljs-built_in">Value</span>(header + <span class="hljs-number">6</span>, <span class="hljs-number">1</span> + length);<br>      <span class="hljs-keyword">if</span> (actual_crc != expected_crc) &#123;<br>        <span class="hljs-comment">// Drop the rest of the buffer since &quot;length&quot; itself may have</span><br>        <span class="hljs-comment">// been corrupted and if we trust it, we could find some</span><br>        <span class="hljs-comment">// fragment of a real log record that just happens to look</span><br>        <span class="hljs-comment">// like a valid log record.</span><br>        <span class="hljs-type">size_t</span> drop_size = buffer_.<span class="hljs-built_in">size</span>();<br>        buffer_.<span class="hljs-built_in">clear</span>();<br>        <span class="hljs-built_in">ReportCorruption</span>(drop_size, <span class="hljs-string">&quot;checksum mismatch&quot;</span>);<br>        <span class="hljs-keyword">return</span> kBadRecord;<br>      &#125;<br>    &#125;<br>    <span class="hljs-comment">// ------------ End of Code Fragment B -------------</span><br><br>    <span class="hljs-comment">// ------------ Start of Code Fragment C -------------</span><br>    <span class="hljs-comment">// 读取成功，将当前 Block 的 offset 往前移动到下一条 Chunk 的开头</span><br>    buffer_.<span class="hljs-built_in">remove_prefix</span>(kHeaderSize + length);<br><br>    <span class="hljs-comment">// Skip physical record that started before initial_offset_</span><br>    <span class="hljs-keyword">if</span> (end_of_buffer_offset_ - buffer_.<span class="hljs-built_in">size</span>() - kHeaderSize - length &lt;<br>        initial_offset_) &#123;<br>      result-&gt;<span class="hljs-built_in">clear</span>();<br>      <span class="hljs-keyword">return</span> kBadRecord;<br>    &#125;<br><br>    *result = <span class="hljs-built_in">Slice</span>(header + kHeaderSize, length);<br>    <span class="hljs-keyword">return</span> type;<br>    <span class="hljs-comment">// ------------ End of Code Fragment C -------------</span><br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这段代码中，主要包含三部分逻辑。A 部分主要判断当前 Block 中是否还有下一条日志，如果没有则切换到下一个 Block 。如果无法读取下一个 Block 或者下一个 Block 的大小小于一个标准 Block 的大小（32 KB），则说明文件已经读完，将 eof 标志置为 true 。B 部分代码主要是根据还原 ChunkHeader,并且根据数据长度、校验和等信息判断 Chunk 中数据的正确性。程序运行到 C 部分代码则表示前面的读取和校验都没有问题，那么只需要将 buffer 的 offset 前移，然后将读取到的内容包装成一个 <em>Slice</em> 返回即可。以上三段代码便组成了从 Block 中读取一个 Chunk 的逻辑。</p>
+<p>在 A 部分代码中，如果当前 buffer（即当前内存中的 Block）已经读到了末尾，那么就需要从文件中载入下一个 Block 。这里使用的函数是 <code>SequentialFile::Read</code> ，这个函数就是简单地使用系统调用从文件中读取了一段数据出来，因此也就不展开讲了。</p>
+<p>到这里，LevelDB 的 WAL 日志就讲完了。应该说整个逻辑还是比较清晰易懂的，主要就是一些编解码的过程。仔细体会这个过程，对我们理解数据编码解码还是很有帮助的。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" class="category-chain-item">数据库</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/" class="category-chain-item">源代码阅读</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/LevelDB/" class="category-chain-item">LevelDB</a>
+  
+  
+
+  
+
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>LevelDB 源代码阅读（三）：预写日志</div>
+      <div>https://thumarklau.github.io/2021/07/11/leveldb-source-code-reading-3/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2021年7月11日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="SA - 相同方式共享">
+                    <i class="iconfont icon-sa"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/07/13/SkipList/" title="跳表：平衡树的概率替代方案">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">跳表：平衡树的概率替代方案</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/07/10/Leveldb-source-code-reading-2/" title="LevelDB 源代码阅读（二）：读流程">
+                        <span class="hidden-mobile">LevelDB 源代码阅读（二）：读流程</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  
+      <script>
+        if (!window.MathJax) {
+          window.MathJax = {
+            tex    : {
+              inlineMath: { '[+]': [['$', '$']] }
+            },
+            loader : {
+              load: ['ui/lazy']
+            },
+            options: {
+              renderActions: {
+                insertedScript: [200, () => {
+                  document.querySelectorAll('mjx-container').forEach(node => {
+                    let target = node.parentNode;
+                    if (target.nodeName.toLowerCase() === 'li') {
+                      target.parentNode.classList.add('has-jax');
+                    }
+                  });
+                }, '', false]
+              }
+            }
+          };
+        } else {
+          MathJax.startup.document.state(0);
+          MathJax.texReset();
+          MathJax.typeset();
+          MathJax.typesetPromise();
+        }
+
+        Fluid.events.registerRefreshCallback(function() {
+          if ('MathJax' in window && MathJax.startup.document && typeof MathJax.startup.document.state === 'function') {
+            MathJax.startup.document.state(0);
+            MathJax.texReset();
+            MathJax.typeset();
+            MathJax.typesetPromise();
+          }
+        });
+      </script>
+    
+
+  <script  src="https://lib.baomitu.com/mathjax/3.2.2/es5/tex-mml-chtml.js" ></script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

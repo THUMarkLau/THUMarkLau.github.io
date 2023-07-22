@@ -1,0 +1,835 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="在日常开发中，我们经常需要对一段代码进行性能测试，以验证我们的优化手段是否有效。通常我们的做法可能是public void someFunction() { long startTime &#x3D; System.nanoTime();&#x2F;&#x2F; do some execution long timeCost &#x3D; System.nanoTime() - startTime;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java 基准测试工具：JMH">
+<meta property="og:url" content="https://thumarklau.github.io/2023/04/24/jhm-introduce/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="在日常开发中，我们经常需要对一段代码进行性能测试，以验证我们的优化手段是否有效。通常我们的做法可能是public void someFunction() { long startTime &#x3D; System.nanoTime();&#x2F;&#x2F; do some execution long timeCost &#x3D; System.nanoTime() - startTime;">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://thumarklau.github.io/img/jhm.jpg">
+<meta property="article:published_time" content="2023-04-24T10:58:05.000Z">
+<meta property="article:modified_time" content="2023-07-19T13:57:08.375Z">
+<meta property="article:author" content="MarkLau">
+<meta property="article:tag" content="Java">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thumarklau.github.io/img/jhm.jpg">
+  
+  
+  
+  <title>Java 基准测试工具：JMH - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"thumarklau.github.io","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="Java 基准测试工具：JMH"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2023-04-24 18:58" pubdate>
+          2023年4月24日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          8.5k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          71 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">Java 基准测试工具：JMH</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>在日常开发中，我们经常需要对一段代码进行性能测试，以验证我们的优化手段是否有效。通常我们的做法可能是</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs Java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">someFunction</span><span class="hljs-params">()</span> &#123;<br>    <span class="hljs-type">long</span> <span class="hljs-variable">startTime</span> <span class="hljs-operator">=</span> System.nanoTime();<br>    <span class="hljs-comment">// do some execution</span><br>    <span class="hljs-type">long</span> <span class="hljs-variable">timeCost</span> <span class="hljs-operator">=</span> System.nanoTime() - startTime;<br>    System.out.println(<span class="hljs-string">&quot;Time cost is %d ns&quot;</span>.format(timeCost));<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>如果我们需要对这段代码测试之后取平均值，那么我们还得在外面加上一个循环。如果需要计算方差等数据，还需要写更多额外的代码。如果考虑到 JIT 编译，那么我们还需要在测试之前加上 Warm up 的过程。有没有什么工具能够帮助我们完成这个过程呢？就像我们会用 JUnit 来帮助我们完成单元测试一样，Java 中的 Java Microbenchmark Harness（JMH）就是一个帮助我们完成基准测试的工具。</p>
+<h1 id="什么是-JMH"><a href="#什么是-JMH" class="headerlink" title="什么是 JMH"></a>什么是 JMH</h1><p>JMH 是一个用于编写、执行和分析Java代码微基准测试的框架。微基准测试是一种性能测试方法，用于测量代码片段的执行时间。它们通常用于评估不同实现之间的性能差异，以确定哪个实现更适合特定场景。JMH由OpenJDK项目开发和维护，因此具有很高的可靠性和稳定性。</p>
+<p>JMH的主要功能如下：</p>
+<ol>
+<li>自动执行：JMH会自动运行基准测试，控制迭代次数、预热时间等参数，以确保测试结果的准确性。</li>
+<li>精确度：JMH通过减少常见的微基准测试陷阱（例如死代码消除、循环展开等）来提高测试的精确度。</li>
+<li>灵活性：JMH支持多种输出格式，如CSV、JSON等，便于结果分析和可视化。同时，它还允许用户自定义基准测试的各种参数，如预热时间、迭代次数等。</li>
+<li>注解驱动：JMH使用注解来标记基准测试方法，方便快速编写测试代码。</li>
+</ol>
+<h1 id="一个简单的例子"><a href="#一个简单的例子" class="headerlink" title="一个简单的例子"></a>一个简单的例子</h1><p>如果我们想要在一个 Maven 项目中使用 JMH，首先需要在 <code>pom.xml</code> 中加入</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><code class="hljs xml"><span class="hljs-tag">&lt;<span class="hljs-name">dependency</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">groupId</span>&gt;</span>org.openjdk.jmh<span class="hljs-tag">&lt;/<span class="hljs-name">groupId</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">artifactId</span>&gt;</span>jmh-core<span class="hljs-tag">&lt;/<span class="hljs-name">artifactId</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">version</span>&gt;</span>1.32<span class="hljs-tag">&lt;/<span class="hljs-name">version</span>&gt;</span><br><span class="hljs-tag">&lt;/<span class="hljs-name">dependency</span>&gt;</span><br><span class="hljs-tag">&lt;<span class="hljs-name">dependency</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">groupId</span>&gt;</span>org.openjdk.jmh<span class="hljs-tag">&lt;/<span class="hljs-name">groupId</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">artifactId</span>&gt;</span>jmh-generator-annprocess<span class="hljs-tag">&lt;/<span class="hljs-name">artifactId</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">version</span>&gt;</span>1.32<span class="hljs-tag">&lt;/<span class="hljs-name">version</span>&gt;</span><br><span class="hljs-tag">&lt;/<span class="hljs-name">dependency</span>&gt;</span><br></code></pre></td></tr></table></figure>
+<p>在代码中，我们可以通过注解来指定我们要测试的内容。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><code class="hljs java"><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.Benchmark;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.BenchmarkMode;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.Measurement;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.Mode;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.OutputTimeUnit;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.Scope;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.State;<br><span class="hljs-keyword">import</span> org.openjdk.jmh.annotations.Warmup;<br><br><span class="hljs-keyword">import</span> java.util.ArrayList;<br><span class="hljs-keyword">import</span> java.util.List;<br><span class="hljs-keyword">import</span> java.util.concurrent.TimeUnit;<br><br><span class="hljs-meta">@State(Scope.Thread)</span><br><span class="hljs-meta">@BenchmarkMode(Mode.AverageTime)</span><br><span class="hljs-meta">@OutputTimeUnit(TimeUnit.NANOSECONDS)</span><br><span class="hljs-meta">@Warmup(iterations = 3, time = 1)</span><br><span class="hljs-meta">@Measurement(iterations = 3, time = 5)</span><br><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">JMHExample</span> &#123;<br>  <span class="hljs-meta">@Benchmark</span><br>  <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">addArrayList</span><span class="hljs-params">()</span> &#123;<br>    List&lt;Integer&gt; list = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ArrayList</span>&lt;&gt;();<br>    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">10_0000</span>; i++) &#123;<br>      list.add(<span class="hljs-number">0</span>);<br>    &#125;<br>  &#125;<br><br>  <span class="hljs-meta">@Benchmark</span><br>  <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">addLinkedList</span><span class="hljs-params">()</span> &#123;<br>    List&lt;Integer&gt; list = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ArrayList</span>&lt;&gt;();<br>    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> <span class="hljs-variable">i</span> <span class="hljs-operator">=</span> <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">10_0000</span>; i++) &#123;<br>      list.add(<span class="hljs-number">0</span>);<br>    &#125;<br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+<p>在运行前，我们需要在 IDEA 中下载 JMH 插件，这个插件能够帮助我们在 IDEA 直接运行性能测试。下载成功以后，IDEA 的界面如图所示，我们直接点击左边的三个运行按钮即可运行 Benchmark。<br><img src="IDEA-plugins.png" srcset="/img/loading.gif" lazyload width="50%"><br>运行结果如下：</p>
+<figure class="highlight livecodeserver"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><code class="hljs livecodeserver"><span class="hljs-comment"># JMH version: 1.33</span><br><span class="hljs-comment"># VM version: JDK 11.0.2, OpenJDK 64-Bit Server VM, 11.0.2+9</span><br><span class="hljs-comment"># VM invoker: C:\Program Files\Java\jdk-11.0.2\bin\java.exe</span><br><span class="hljs-comment"># VM options: -javaagent:C:\Program Files\JetBrains\IntelliJ IDEA 2022.3.1\lib\idea_rt.jar=62315:C:\Program Files\JetBrains\IntelliJ IDEA 2022.3.1\bin -Dfile.encoding=UTF-8</span><br><span class="hljs-comment"># Blackhole mode: full + dont-inline hint (default, use -Djmh.blackhole.autoDetect=true to auto-detect)</span><br><span class="hljs-comment"># Warmup: 3 iterations, 1 s each</span><br><span class="hljs-comment"># Measurement: 3 iterations, 5 s each</span><br><span class="hljs-comment"># Timeout: 10 min per iteration</span><br><span class="hljs-comment"># Threads: 1 thread, will synchronize iterations</span><br><span class="hljs-comment"># Benchmark mode: Average time, time/op</span><br><span class="hljs-comment"># Benchmark: org.example.JMHExample.addArrayList</span><br><br><span class="hljs-comment"># Run progress: 0.00% complete, ETA 00:03:00</span><br><span class="hljs-comment"># Fork: 1 of 5</span><br><span class="hljs-comment"># Warmup Iteration   1: 339789.195 ns/op</span><br><span class="hljs-comment"># Warmup Iteration   2: 262514.212 ns/op</span><br><span class="hljs-comment"># Warmup Iteration   3: 259732.333 ns/op</span><br>Iteration   <span class="hljs-number">1</span>: <span class="hljs-number">269787.357</span> ns/op<br>Iteration   <span class="hljs-number">2</span>: <span class="hljs-number">307217.039</span> ns/op<br>Iteration   <span class="hljs-number">3</span>: <span class="hljs-number">368421.391</span> ns/op<br><br>...<br><br><br>Result <span class="hljs-string">&quot;org.example.JMHExample.addArrayList&quot;</span>:<br>  <span class="hljs-number">281986.682</span> ±(<span class="hljs-number">99.9</span>%) <span class="hljs-number">28381.842</span> ns/op [Average]<br>  (<span class="hljs-built_in">min</span>, <span class="hljs-built_in">avg</span>, <span class="hljs-built_in">max</span>) = (<span class="hljs-number">262447.982</span>, <span class="hljs-number">281986.682</span>, <span class="hljs-number">368421.391</span>), stdev = <span class="hljs-number">26548.393</span><br>  CI (<span class="hljs-number">99.9</span>%): [<span class="hljs-number">253604.840</span>, <span class="hljs-number">310368.524</span>] (assumes <span class="hljs-keyword">normal</span> distribution)<br><br><br><span class="hljs-comment"># JMH version: 1.33</span><br><span class="hljs-comment"># VM version: JDK 11.0.2, OpenJDK 64-Bit Server VM, 11.0.2+9</span><br><span class="hljs-comment"># VM invoker: C:\Program Files\Java\jdk-11.0.2\bin\java.exe</span><br><span class="hljs-comment"># VM options: -javaagent:C:\Program Files\JetBrains\IntelliJ IDEA 2022.3.1\lib\idea_rt.jar=62315:C:\Program Files\JetBrains\IntelliJ IDEA 2022.3.1\bin -Dfile.encoding=UTF-8</span><br><span class="hljs-comment"># Blackhole mode: full + dont-inline hint (default, use -Djmh.blackhole.autoDetect=true to auto-detect)</span><br><span class="hljs-comment"># Warmup: 3 iterations, 1 s each</span><br><span class="hljs-comment"># Measurement: 3 iterations, 5 s each</span><br><span class="hljs-comment"># Timeout: 10 min per iteration</span><br><span class="hljs-comment"># Threads: 1 thread, will synchronize iterations</span><br><span class="hljs-comment"># Benchmark mode: Average time, time/op</span><br><span class="hljs-comment"># Benchmark: org.example.JMHExample.addLinkedList</span><br><br><span class="hljs-comment"># Run progress: 50.00% complete, ETA 00:01:34</span><br><span class="hljs-comment"># Fork: 1 of 5</span><br><span class="hljs-comment"># Warmup Iteration   1: 349367.752 ns/op</span><br><span class="hljs-comment"># Warmup Iteration   2: 289455.708 ns/op</span><br><span class="hljs-comment"># Warmup Iteration   3: 287668.947 ns/op</span><br>Iteration   <span class="hljs-number">1</span>: <span class="hljs-number">274087.549</span> ns/op<br>Iteration   <span class="hljs-number">2</span>: <span class="hljs-number">266708.740</span> ns/op<br>Iteration   <span class="hljs-number">3</span>: <span class="hljs-number">268492.382</span> ns/op<br><br>...<br><br><br>Result <span class="hljs-string">&quot;org.example.JMHExample.addLinkedList&quot;</span>:<br>  <span class="hljs-number">266844.826</span> ±(<span class="hljs-number">99.9</span>%) <span class="hljs-number">4881.063</span> ns/op [Average]<br>  (<span class="hljs-built_in">min</span>, <span class="hljs-built_in">avg</span>, <span class="hljs-built_in">max</span>) = (<span class="hljs-number">258488.261</span>, <span class="hljs-number">266844.826</span>, <span class="hljs-number">274087.549</span>), stdev = <span class="hljs-number">4565.749</span><br>  CI (<span class="hljs-number">99.9</span>%): [<span class="hljs-number">261963.764</span>, <span class="hljs-number">271725.889</span>] (assumes <span class="hljs-keyword">normal</span> distribution)<br><br><br><span class="hljs-comment"># Run complete. Total time: 00:03:08</span><br><br>REMEMBER: The numbers below are just data. To gain reusable insights, you need <span class="hljs-built_in">to</span> follow up <span class="hljs-keyword">on</span><br>why <span class="hljs-keyword">the</span> numbers are <span class="hljs-keyword">the</span> way they are. Use profilers (see -prof, -lprof), design factorial<br>experiments, perform baseline <span class="hljs-keyword">and</span> negative tests that provide experimental control, make sure<br><span class="hljs-keyword">the</span> benchmarking environment is safe <span class="hljs-keyword">on</span> <span class="hljs-title">JVM</span>/<span class="hljs-title">OS</span>/<span class="hljs-title">HW</span> <span class="hljs-title">level</span>, <span class="hljs-title">ask</span> <span class="hljs-title">for</span> <span class="hljs-title">reviews</span> <span class="hljs-title">from</span> <span class="hljs-title">the</span> <span class="hljs-title">domain</span> <span class="hljs-title">experts</span>.<br>Do <span class="hljs-keyword">not</span> assume <span class="hljs-keyword">the</span> numbers tell you what you want them <span class="hljs-built_in">to</span> tell.<br><br>Benchmark                 Mode  Cnt       Score       Error  Units<br>JMHExample.addArrayList   avgt   <span class="hljs-number">15</span>  <span class="hljs-number">281986.682</span> ± <span class="hljs-number">28381.842</span>  ns/op<br>JMHExample.addLinkedList  avgt   <span class="hljs-number">15</span>  <span class="hljs-number">266844.826</span> ±  <span class="hljs-number">4881.063</span>  ns/op<br></code></pre></td></tr></table></figure>
+<p>在这个例子中，我们使用注解在代码中指定了我们测试的方式。</p>
+<p><code>@State</code> 注解指定了对象在工作线程之间的共享程度。按照示例代码中 <code>@State(Scope.Thread)</code> 的指示，JMH 会为每一个线程都创建一个 <code>JMHExample</code> 实例。如果我们将注解改为 <code>@State(Scope.Benchmark)</code>，那么 JMH 就会在多个线程之间共享一个 <code>JMHExample</code> 实例，这样可以帮助我们测试某个方法在多线程下的性能。此外，还可以选择 <code>@State(Scope.Group)</code> ，JMH 将在一个线程组内共享一个 <code>JMHExample</code> 实例。</p>
+<p><code>@BenchmarkMode(Mode.AverageTime)</code> 注解指定了这次测试主要统计平均的响应时间，此外还有吞吐、响应时间范围、跳过 JIT 的响应时间可选。</p>
+<p><code>@OutputTimeUnit(TimeUnit.NANOSECONDS)</code> 指定了输出结果的单位是纳秒。</p>
+<p><code>@Warmup(iterations = 3, time = 1)</code> 指定了预热阶段的配置，每次基准测试前进行三次预热，每次预热的迭代时间为 1 秒。预热可以在测试之前提前运行代码，有利于 JVM 对待测代码进行 JIT 编译，提高代码的运行效率。</p>
+<p><code>@Measurement(iterations = 3, time = 5)</code> 制定了基准测试的配置，基准测试总共运行 3 次，每次测试都运行 5 秒钟。</p>
+<p><code>@Benchmark</code> 需要写在需要测试的方法前，就像 JUnit 里的 <code>@Test</code> 注解一样，框架会根据这些注解找到需要测试的函数，并根据配置运行这些函数。在同一个类里，<code>@Benchmark</code> 可以写在多个函数中，测试时 JMH 框架会依次对这些被标记的函数进行测试。</p>
+<p>对于简单的函数，我们可以在 IDEA 中运行测试。对于一些平台依赖的代码（例如必须在 Linux 上运行的代码）或者耗时较久的代码，我们可以把代码编译成 jar 包放到服务器上运行。因此，需要在 <code>pom.xml</code> 中加入</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><code class="hljs xml"><span class="hljs-tag">&lt;<span class="hljs-name">build</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">finalName</span>&gt;</span>JMH-Test<span class="hljs-tag">&lt;/<span class="hljs-name">finalName</span>&gt;</span><br>    <span class="hljs-tag">&lt;<span class="hljs-name">plugins</span>&gt;</span><br>        <span class="hljs-tag">&lt;<span class="hljs-name">plugin</span>&gt;</span><br>            <span class="hljs-tag">&lt;<span class="hljs-name">groupId</span>&gt;</span>org.apache.maven.plugins<span class="hljs-tag">&lt;/<span class="hljs-name">groupId</span>&gt;</span><br>            <span class="hljs-tag">&lt;<span class="hljs-name">artifactId</span>&gt;</span>maven-shade-plugin<span class="hljs-tag">&lt;/<span class="hljs-name">artifactId</span>&gt;</span><br>            <span class="hljs-tag">&lt;<span class="hljs-name">version</span>&gt;</span>2.4.1<span class="hljs-tag">&lt;/<span class="hljs-name">version</span>&gt;</span><br>            <span class="hljs-tag">&lt;<span class="hljs-name">executions</span>&gt;</span><br>                <span class="hljs-tag">&lt;<span class="hljs-name">execution</span>&gt;</span><br>                    <span class="hljs-tag">&lt;<span class="hljs-name">phase</span>&gt;</span>package<span class="hljs-tag">&lt;/<span class="hljs-name">phase</span>&gt;</span><br>                    <span class="hljs-tag">&lt;<span class="hljs-name">goals</span>&gt;</span><br>                        <span class="hljs-tag">&lt;<span class="hljs-name">goal</span>&gt;</span>shade<span class="hljs-tag">&lt;/<span class="hljs-name">goal</span>&gt;</span><br>                    <span class="hljs-tag">&lt;/<span class="hljs-name">goals</span>&gt;</span><br>                    <span class="hljs-tag">&lt;<span class="hljs-name">configuration</span>&gt;</span><br>                        <span class="hljs-tag">&lt;<span class="hljs-name">transformers</span>&gt;</span><br>                            <span class="hljs-tag">&lt;<span class="hljs-name">transformer</span></span><br><span class="hljs-tag">                                    <span class="hljs-attr">implementation</span>=<span class="hljs-string">&quot;org.apache.maven.plugins.shade.resourceManifestResourceTransformer&quot;</span>&gt;</span><br>                                <span class="hljs-tag">&lt;<span class="hljs-name">mainClass</span>&gt;</span>org.example.JMHExample<span class="hljs-tag">&lt;/<span class="hljs-name">mainClass</span>&gt;</span><br>                            <span class="hljs-tag">&lt;/<span class="hljs-name">transformer</span>&gt;</span><br>                        <span class="hljs-tag">&lt;/<span class="hljs-name">transformers</span>&gt;</span><br>                    <span class="hljs-tag">&lt;/<span class="hljs-name">configuration</span>&gt;</span><br>                <span class="hljs-tag">&lt;/<span class="hljs-name">execution</span>&gt;</span><br>            <span class="hljs-tag">&lt;/<span class="hljs-name">executions</span>&gt;</span><br>        <span class="hljs-tag">&lt;/<span class="hljs-name">plugin</span>&gt;</span><br>    <span class="hljs-tag">&lt;/<span class="hljs-name">plugins</span>&gt;</span><br><span class="hljs-tag">&lt;/<span class="hljs-name">build</span>&gt;</span><br></code></pre></td></tr></table></figure>
+<p>在类 <code>JMHExmaple</code> 中加入主函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> <span class="hljs-keyword">throws</span> RunnerException &#123;<br>    <span class="hljs-type">Options</span> <span class="hljs-variable">opt</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OptionsBuilder</span>()<br>        .include(JMHExample.class.getSimpleName())<br>        .result(<span class="hljs-string">&quot;result.json&quot;</span>)<br>        .resultFormat(ResultFormatType.JSON).build();<br>    <span class="hljs-keyword">new</span> <span class="hljs-title class_">Runner</span>(opt).run();<br>&#125;<br></code></pre></td></tr></table></figure>
+<p>然后执行 <code>mvn clean package</code>，然后将 <code>JMH-Test.jar</code> 发送到服务器上，并使用</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs shell">java -jar JMH-Test.jar<br></code></pre></td></tr></table></figure>
+<p>命令运行即可。运行结束后，结果会保存在 <code>result.json</code> 文件中。</p>
+<h1 id="JMH-的其他注解"><a href="#JMH-的其他注解" class="headerlink" title="JMH 的其他注解"></a>JMH 的其他注解</h1><p>我们在实例中介绍了 <code>@State</code>、<code>@BenchmarkMode</code>、<code>@OutputTimeUnit</code>、<code>@Warmup</code>、<code>@Measurement</code> 以及 <code>@Benchmark</code> 注解，JMH 中还有其他很实用的注解。</p>
+<p>与 JUnit 类似，JMH 中的 <code>@Setup</code> 和 <code>@TearDown</code> 注解允许我们标记基准测试的初始化函数和终止函数。在这两个函数中可以处理一些资源的初始化和回收工作。</p>
+<p><code>@Fork</code> 注解用于指定 Measurement 的次数，例如 <code>@Fork(1)</code>，对某一段代码就只会运行一次 Measurement。<code>@Fork</code> 注解必须作用于一个类上或者一个方法上。默认情况下，Fork 的值为 5，也就是对一个方法会进行 5 次的 Measurement。</p>
+<p><code>@Threads</code> 注解可以指定某个测试的线程数，可以作用于类上或者方法上。</p>
+<p>JMH 在运行前会对代码进行一定的优化，例如删去一些 Dead Code。例如下面这段代码，在 JMH 中的运行时间是差不多的</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><code class="hljs Java"><span class="hljs-meta">@State(Scope.Thread)</span><br><span class="hljs-meta">@BenchmarkMode(Mode.AverageTime)</span><br><span class="hljs-meta">@OutputTimeUnit(TimeUnit.NANOSECONDS)</span><br><span class="hljs-meta">@Warmup(iterations = 3, time = 1)</span><br><span class="hljs-meta">@Measurement(iterations = 3, time = 5)</span><br><span class="hljs-meta">@Fork(1)</span><br><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">JMHExample</span>  &#123;<br><br>    <span class="hljs-meta">@Benchmark</span><br>    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">test1</span><span class="hljs-params">()</span><br>    &#123;<br>    &#125;<br><br>    <span class="hljs-meta">@Benchmark</span><br>    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">test2</span><span class="hljs-params">()</span><br>    &#123;<br>        Math.log(Math.PI);<br>    &#125;<br><br>    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> <span class="hljs-keyword">throws</span> RunnerException &#123;<br>        <span class="hljs-keyword">final</span> <span class="hljs-type">Options</span> <span class="hljs-variable">opts</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OptionsBuilder</span>()<br>                .include(JmhTestApp13_CompilerControl1.class.getSimpleName())<br>                .build();<br>        <span class="hljs-keyword">new</span> <span class="hljs-title class_">Runner</span>(opts).run();<br>    &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+<p>运行结果</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs apache"><span class="hljs-attribute">Benchmark</span>         Mode  Cnt  Score   Error  Units<br><span class="hljs-attribute">JMHExample</span>.test1  avgt    <span class="hljs-number">3</span>  <span class="hljs-number">0</span>.<span class="hljs-number">215</span> ± <span class="hljs-number">0</span>.<span class="hljs-number">007</span>  ns/op<br><span class="hljs-attribute">JMHExample</span>.test2  avgt    <span class="hljs-number">3</span>  <span class="hljs-number">0</span>.<span class="hljs-number">214</span> ± <span class="hljs-number">0</span>.<span class="hljs-number">022</span>  ns/op<br></code></pre></td></tr></table></figure>
+<p>原因是 JMH 识别出了 <code>test2</code> 中的 <code>Math.log(Math.PI)</code> 是一段死代码，并没有任何意义，因此没有执行。<code>@CompilerControl</code> 可以控制 JMH 的这类行为，例如在 <code>test2</code> 方法前 <code>@CompilerControl.Mode.EXCLUDE</code> 就可以令编译器不做去掉死代码的行为，得到的结果为</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs apache"><span class="hljs-attribute">Benchmark</span>         Mode  Cnt   Score   Error  Units<br><span class="hljs-attribute">JMHExample</span>.test1  avgt    <span class="hljs-number">3</span>   <span class="hljs-number">0</span>.<span class="hljs-number">213</span> ± <span class="hljs-number">0</span>.<span class="hljs-number">008</span>  ns/op<br><span class="hljs-attribute">JMHExample</span>.test2  avgt    <span class="hljs-number">3</span>  <span class="hljs-number">44</span>.<span class="hljs-number">397</span> ± <span class="hljs-number">5</span>.<span class="hljs-number">358</span>  ns/op<br></code></pre></td></tr></table></figure>
+<p>可以看出，此时两个函数之间性能有了明显差距。<code>CompilerControl.Mode</code> 有 6 种选择，分别是</p>
+<figure class="highlight gradle"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs gradle"><span class="hljs-keyword">BREAK</span>: 在生成的代码中插入断点；<br><span class="hljs-keyword">PRINT</span>：打印代码编译后的汇编代码；<br><span class="hljs-keyword">EXCLUDE</span>：将代码从编译去除（不参与编译期的优化）；<br>INLINE：强制代码内联；<br>DONT_INLINE：强制代码不内联；<br>COMPILE_ONLY：只对这份代码做编译，不做其他事情。<br></code></pre></td></tr></table></figure>
+
+<h1 id="参考文章"><a href="#参考文章" class="headerlink" title="参考文章"></a>参考文章</h1><p><a target="_blank" rel="noopener" href="https://www.wdbyte.com/2020/08/develop/tool-jmh/">JMH - Java 代码性能基准测试</a></p>
+<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/u014282578/article/details/127952593">性能调优之JMH必知必会1：什么是JMH</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/54chensongxia/p/15485421.html">JMH 使用指南</a></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/openjdk/jmh/tree/master/jmh-samples/src/main/java/org/openjdk/jmh/samples"> JMH 官方提供的用例</a></p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/Java/" class="category-chain-item">Java</a>
+  
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/Java/">#Java</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>Java 基准测试工具：JMH</div>
+      <div>https://thumarklau.github.io/2023/04/24/jhm-introduce/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2023年4月24日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="SA - 相同方式共享">
+                    <i class="iconfont icon-sa"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2023/04/26/shell-tips/" title="ShellScript 的一些实用使用方法">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">ShellScript 的一些实用使用方法</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/07/22/leveldb-source-code-reading-5/" title="LevelDB 源代码阅读（五）：SSTable">
+                        <span class="hidden-mobile">LevelDB 源代码阅读（五）：SSTable</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  
+      <script>
+        if (!window.MathJax) {
+          window.MathJax = {
+            tex    : {
+              inlineMath: { '[+]': [['$', '$']] }
+            },
+            loader : {
+              load: ['ui/lazy']
+            },
+            options: {
+              renderActions: {
+                insertedScript: [200, () => {
+                  document.querySelectorAll('mjx-container').forEach(node => {
+                    let target = node.parentNode;
+                    if (target.nodeName.toLowerCase() === 'li') {
+                      target.parentNode.classList.add('has-jax');
+                    }
+                  });
+                }, '', false]
+              }
+            }
+          };
+        } else {
+          MathJax.startup.document.state(0);
+          MathJax.texReset();
+          MathJax.typeset();
+          MathJax.typesetPromise();
+        }
+
+        Fluid.events.registerRefreshCallback(function() {
+          if ('MathJax' in window && MathJax.startup.document && typeof MathJax.startup.document.state === 'function') {
+            MathJax.startup.document.state(0);
+            MathJax.texReset();
+            MathJax.typeset();
+            MathJax.typesetPromise();
+          }
+        });
+      </script>
+    
+
+  <script  src="https://lib.baomitu.com/mathjax/3.2.2/es5/tex-mml-chtml.js" ></script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

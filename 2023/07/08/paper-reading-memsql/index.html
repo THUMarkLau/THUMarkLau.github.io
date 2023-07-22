@@ -1,0 +1,861 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="最近暑期实习的工作是和 MySQL 的查询优化器相关。过去我在 IoTDB 所做的工作主要和存储引擎相关，对于查询的了解仅限于火山模型，对查询优化的了解仅限于知道有 RBO 和 CBO。对于暑期工作的内容，我基本上需要从头开始学。我学习查询优化主要方式包括论文阅读、网络上的公开课和讲座（CMU 15-721 以及 CMU Database Group 关于 Query Optimizer 的系列讲">
+<meta property="og:type" content="article">
+<meta property="og:title" content="论文笔记：The MemSQL Query Optimizer: A modern optimizer for real-time analytics in a distributed database">
+<meta property="og:url" content="https://thumarklau.github.io/2023/07/08/paper-reading-memsql/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="最近暑期实习的工作是和 MySQL 的查询优化器相关。过去我在 IoTDB 所做的工作主要和存储引擎相关，对于查询的了解仅限于火山模型，对查询优化的了解仅限于知道有 RBO 和 CBO。对于暑期工作的内容，我基本上需要从头开始学。我学习查询优化主要方式包括论文阅读、网络上的公开课和讲座（CMU 15-721 以及 CMU Database Group 关于 Query Optimizer 的系列讲">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://thumarklau.github.io/2023/07/08/paper-reading-memsql/memsql-meets-the-microservices-architecture_1.jpg">
+<meta property="og:image" content="https://thumarklau.github.io/2023/07/08/paper-reading-memsql/bushy-join.png">
+<meta property="og:image" content="https://thumarklau.github.io/2023/07/08/paper-reading-memsql/join-graph.jpg">
+<meta property="article:published_time" content="2023-07-08T12:24:07.000Z">
+<meta property="article:modified_time" content="2023-07-19T13:57:08.402Z">
+<meta property="article:author" content="MarkLau">
+<meta property="article:tag" content="论文笔记">
+<meta property="article:tag" content="数据库">
+<meta property="article:tag" content="查询优化器">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thumarklau.github.io/2023/07/08/paper-reading-memsql/memsql-meets-the-microservices-architecture_1.jpg">
+  
+  
+  
+  <title>论文笔记：The MemSQL Query Optimizer: A modern optimizer for real-time analytics in a distributed database - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"thumarklau.github.io","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="论文笔记：The MemSQL Query Optimizer: A modern optimizer for real-time analytics in a distributed database"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2023-07-08 20:24" pubdate>
+          2023年7月8日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          9.6k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          80 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">论文笔记：The MemSQL Query Optimizer: A modern optimizer for real-time analytics in a distributed database</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>最近暑期实习的工作是和 MySQL 的查询优化器相关。过去我在 IoTDB 所做的工作主要和存储引擎相关，对于查询的了解仅限于火山模型，对查询优化的了解仅限于知道有 RBO 和 CBO。对于暑期工作的内容，我基本上需要从头开始学。我学习查询优化主要方式包括论文阅读、网络上的公开课和讲座（CMU 15-721 以及 CMU Database Group 关于 Query Optimizer 的系列讲座）以及数据库查询优化器的源代码阅读（主要是 MySQL）。目前为止看了大概有六七篇论文，对查询优化器有了一些初步的概念。有些时候我看完论文再过一段时间，就会记不清楚论文讲的一些东西了。所以我决定写一些阅读笔记来记录一下自己看的这些论文，也方便和大家的交流学习。因为在查询优化器领域我算是刚刚入门，所以论文里有些地方我可能理解的不对，如果有错误之处希望各位读者及时指出。</p>
+<p>这篇论文发表在 VLDB 2016 上，原文链接为：<a target="_blank" rel="noopener" href="https://vldb.org/pvldb/vol9/p1401-chen.pdf">https://vldb.org/pvldb/vol9/p1401-chen.pdf</a></p>
+<h1 id="MemSQL-简介"><a href="#MemSQL-简介" class="headerlink" title="MemSQL 简介"></a>MemSQL 简介</h1><p>MemSQL 是一个分布式的、针对内存优化的数据库，擅长大规模混合实时分析和事务处理。MemSQL 在内存里用行式存储，在磁盘上使用列式存储，查询的时候可以从这两种不同格式的数据源中获取数据。MemSQL 利用了 MVCC 和针对内存优化的无锁数据结构来增加读写的并发度，从而实现了对运营数据库的实时分析。MemSQL 的设计目标是在通用计算机上进行拓展，而不需要任何特定的硬件或者指令集。</p>
+<p><img src="/2023/07/08/paper-reading-memsql/memsql-meets-the-microservices-architecture_1.jpg" srcset="/img/loading.gif" lazyload></p>
+<p>MemSQL 的分布式架构是 Share-Nothing 架构，集群中的节点分为调度节点（aggregator nodes）和执行节点（leaf nodes）。前者的作用是作为集群和客户端之间的中介，后者则负责存储数据和执行查询。用户的查询时，查询会先发到调度节点上，被解析、优化和规划（planned）之后发送到执行节点上执行。</p>
+<p>MemSQL 中的数据有两种分布方式，一种是对表中的每一行都根据 shard key 进行哈希，即水平分片；另一种则是对表中的内容在集群中的所有节点都进行复制。为了在集群中执行一个查询，调度节点会把 SQL 转换成一个分布式查询计划（DQEP）。一个 DQEP 里包含很多步骤，每一个步骤可以用 SQL-Like 的语法进行描述。为了描述 DQEP 中的内容，MemSQL 对标准 SQL 继续进行了拓展，往其中加入了 <em>RemoteTables</em> 和 <em>ResultTables</em> 两个关键字。</p>
+<p>查询计划生成后被编译成机器代码并且缓存起来，以加速后续查询的执行。MemSQL 不会缓存查询的结果，只缓存查询的计划。在编译查询计划时没有指定预设参数的值，因此后续查询的参数不同也可以利用前面缓存住的查询计划。</p>
+<h1 id="MemSQL-的优化器"><a href="#MemSQL-的优化器" class="headerlink" title="MemSQL 的优化器"></a>MemSQL 的优化器</h1><p>MemSQL 上运行的很多查询都是复杂的实时分析型查询，包括星型模型和雪花模型下的 join、排序、分组、聚集查询以及嵌套子查询等等。MemSQL 的优化器不仅要找到一个高质量的查询计划，还要保证执行查询优化本身的时间不能太长。这是因为 MemSQL 的查询延迟都需要在秒级甚至更短，如果查询优化本身的开销很大就会导致其成为查询延迟中显著的一部分。</p>
+<p>对分布式数据库开发一个优化器是一个很难的任务，如果使用已有的查询优化器，可能无法完成前面所述的目标（高质量且耗时短），并且还会继承已有优化器的所有缺点。因此，MemSQL 决定自己从头造一个优化器。 </p>
+<p>MemSQL 的优化器主要包含以下几个组成部分：Rewriter、Enumerator 和 Planner。下面我们逐一进行介绍。</p>
+<h2 id="Rewriter"><a href="#Rewriter" class="headerlink" title="Rewriter"></a>Rewriter</h2><h3 id="基于分布式代价的查询重写"><a href="#基于分布式代价的查询重写" class="headerlink" title="基于分布式代价的查询重写"></a>基于分布式代价的查询重写</h3><p>Rewriter负责对查询进行等价的逻辑转换。MemSQL 的 Rewriter 把变换规则分为了两类，一类是启发式规则，即无需进行代价判断就可以直接使用规则，例如列消除（Column Elimination），一定可以减少系统的 IO 和计算；另一类是基于代价的规则，这种规则使用之后不一定可以给查询带来性能优化，所以需要通过代价来判断到底是不是有益的。例如对于一个带有多表 join 的视图，如果将它展开到上层查询中，就会在上层查询中出现一个特别大的 join，对于 Enumerator 来说比较难优化。此外，将子查询展开到上层会使得子查询在连接图（join graph）中的结构信息消失，这些结构信息对在对 join 进行优化时可能是有用的。因此，是否对子查询进行展开需要通过 cost 来判断。</p>
+<p>Rewriter 通过 Enumerator 来计算候选查询计划的代价。由于 Rewriter 中的每条规则通常只会对一整个查询中的一部分进行修改，其他部分往往保持不变，为了减少 Enumerator 计算的开销，Enumerator 只会计算 Rewriter 改变的那一部分的代价，对于查询中其他不变的部分则不进行计算。在计算一个查询计划的代价的时候，不仅需要考虑到在单机上执行的代价，还要考虑到在分布式条件下不同节点之间数据传输的代价，这一点作者在文中有反复提到，并且给了一个例子来说明考虑数据分布代价和不考虑数据分布代价之间的区别。例如，有下面两条 SQL，它们之间是等价的：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> T1 (a <span class="hljs-type">int</span>, b <span class="hljs-type">int</span>, shard key (b));<br><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> T2 (a <span class="hljs-type">int</span>, b <span class="hljs-type">int</span>, shard key (a),<br>            <span class="hljs-keyword">unique</span> key (a));<br><br>Q1:<br><span class="hljs-keyword">SELECT</span> <span class="hljs-built_in">sum</span>(T1.b) <span class="hljs-keyword">AS</span> s <span class="hljs-keyword">FROM</span> T1, T2<br>    <span class="hljs-keyword">WHERE</span> T1.a <span class="hljs-operator">=</span> T2.a<br>    <span class="hljs-keyword">GROUP</span> <span class="hljs-keyword">BY</span> T1.a, T1.b;<br><br>Q2:<br><span class="hljs-keyword">SELECT</span> V.s <span class="hljs-keyword">from</span> T2,<br>        (<span class="hljs-keyword">SELECT</span> a,<br>            <span class="hljs-built_in">sum</span>(b) <span class="hljs-keyword">as</span> s<br>        <span class="hljs-keyword">FROM</span> T1<br>        <span class="hljs-keyword">GROUP</span> <span class="hljs-keyword">BY</span> T1.a, T1.b<br>        ) V<br>    <span class="hljs-keyword">WHERE</span> V.a <span class="hljs-operator">=</span> T2.a;<br></code></pre></td></tr></table></figure>
+
+<p>假设 T1 表的行数为 $R_1 &#x3D; 200,000$，T2 的行数为 $R_2 &#x3D; 50,000$，对 <code>T1.a, T2.b</code> 进行 Group By 的过滤率为 $S_G &#x3D; \frac{1}{4}$ ，对 <code>T1.a = T2.a</code> 进行 join 之后的过滤率为 $S_J &#x3D; \frac{1}{10}$，并且假设 $S_G$ 和 $S_J$ 是独立的。假读取 <code>T2.a</code> 中的每一行的代价是 $C_J &#x3D; 1$，对每一行数据使用哈希表计算 Group By 的代价是 $C_G &#x3D; 1$，那么 Q1 和 Q2 的代价分别是$Cost_{Q1}&#x3D;R_1C_J + R_1S_JC_G &#x3D; 220,000$ 和 $Cost_{Q2}&#x3D;R_1C_G + R_1S_GC_J &#x3D; 250,000$，那么应当选择 Q1 作为最优查询计划。</p>
+<p>但是在分布式条件下，我们需要考虑数据的分布情况。因为 T2 是在 <code>T2.a</code> 上进行分片的，但是 T1 却不是在 <code>T1.a</code> 上分片的，所以我们需要将 T1 进行 reshuffle 或者对 T2 进行广播（broadcast）。假设 T2 跟 T1 差不多大，那么对 T1 进行 reshuffle 代价是更小的。对于 Q1 来说，在 join 之后进行 group by 不需要进一步移动数据，因为 join 的结果就是根据 <code>T1.a</code> 分布的；对于 Q2 来说，在 join 之前进行 group by 也不需要移动数据，因为数据是根据 <code>T1.b</code> 进行分布的。因此，在执行时 Q1 会先对 T1 根据 <code>T1.a</code> 进行 reshuffle，再在每个分片上执行 join 和 group by；Q2 则会先在每个分片上执行 group by，再将 group by 的结果进行 reshuffle，最后在每个分片上和 T2 做 join。Q1 和 Q2 的执行计划就成了：</p>
+<figure class="highlight pgsql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><code class="hljs pgsql">Q1:<br>    Gather partitions:<span class="hljs-keyword">all</span><br>    Project [r0.s]<br>    NestedLoopJoin<br>    |<span class="hljs-comment">---IndexSeek T2, UNIQUE KEY (a) scan:[a = r0.a]</span><br>    Repartition <span class="hljs-keyword">AS</span> r0 shard_key:[a]<br>    HashGroupBy [SUM(T1.b) <span class="hljs-keyword">AS</span> s] <span class="hljs-keyword">groups</span>:[T1.a, T1.b]<br>    TableScan T1<br>Q2:<br>    Gather partitions:<span class="hljs-keyword">all</span><br>    Project [r0.s]<br>    HashGroupBy [SUM(r0.b) <span class="hljs-keyword">AS</span> s] <span class="hljs-keyword">groups</span>:[r0.a, r0.b]<br>    NestedLoopJoin<br>    |<span class="hljs-comment">---IndexSeek T2, UNIQUE KEY (a) scan:[a = r0.a]</span><br>    Repartition <span class="hljs-keyword">AS</span> r0 shard_key:[a]<br>    TableScan T1<br></code></pre></td></tr></table></figure>
+<p>假设在网络中移动一条数据的代价是 $C_R &#x3D; 3$，那么两个查询的代价则会变成 $Cost_{Q1} &#x3D; R_1C_R + R_1C_J + R_1S_JC_G &#x3D; 620,000$ 和 $Cost_{Q2} &#x3D; R_1C_G + R_1S_GC_R + R_1S_GC_J &#x3D; 400,000$，Q2 成了更好的那一个计划。可见在分布式环境下，数据通过网络的开销会成为查询代价里的主要部分。作者在亚马逊 EC 集群上做的实验表明，执行 Q2 比执行 Q1 要快 2 倍。如果查询优化器没有将分布式代价计算到查询代价里，那么就会错误地选择 Q1 作为最优代价。</p>
+<h3 id="浓密连接"><a href="#浓密连接" class="headerlink" title="浓密连接"></a>浓密连接</h3><p>在对 join 的连接进行搜索时，如果需要考虑各种各样的组合，那么搜索空间就会变得非常大，效率比较低。因此，一些数据库的优化器限定只考虑左深树（例如 System-R，MySQL）或者右深树来减小搜索空间。但是在一些涉及到多个星型模型或雪花模型的查询中，浓密连接（Bushy Join）比左深树或者右深树的执行效率更高。一般来说，对于 Join 顺序的确定都是在对逻辑计划向物理计划转换时完成的，对于 MemSQL 来说则是在 Enumerator 完成这一工作。MemSQL 的 Enumerator 只能生成左深树的查询计划，为了在查询计划中加入浓密连接，MemSQL 在 Rewrite 阶段通过启发式规则将多个表结合成一个 derived table 加入到查询树中。</p>
+<p><img src="/2023/07/08/paper-reading-memsql/bushy-join.png" srcset="/img/loading.gif" lazyload alt="图 2：Left-deep Join vs Bushy Join"></p>
+<p>MemSQL 引入 Bushy Join 的方法是先构建连接图（Join Graph），然后在从连接图中寻找卫星表（satellite table）和种子表（seed table），再将种子表以及其关联的卫星表转化为一个 derived table 加入到查询树中。具体的算法如下：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-number">1.</span> 收集查询中所有的表，并构建一个 <span class="hljs-keyword">join</span> graph，每个表是一个顶点，每个表对之间的连接谓词对应于它们的顶点之间的边<br><span class="hljs-number">2.</span> 识别候选卫星表（satellite <span class="hljs-keyword">table</span>），这些表上至少有一个选择性谓词，如 <span class="hljs-keyword">column</span> <span class="hljs-operator">=</span> const 或 <span class="hljs-keyword">column</span> <span class="hljs-keyword">IN</span> (const, ...) 形式的谓词<br><span class="hljs-number">3.</span> 从候选卫星表的列表中，识别卫星表，这些表只连接到图中的其他一张表（尽管可能有多个连接谓词）<br><span class="hljs-number">4.</span> 识别种子表（seed <span class="hljs-keyword">table</span>），这些表连接到至少两个不同的表，其中至少有一个是卫星表（注意，没有任何一个卫星表可以与超过一个种子表连接，因为卫星表只能和一个表连接）<br><span class="hljs-number">5.</span> 对于每一个种子表：<br>    a) 计算当前计划的代价 C1<br>    b) 创建一个派生表，包含种子表与其相邻的卫星表的连接。一些 <span class="hljs-keyword">SQL</span> 操作符可能阻止一些卫星表被移入子查询，在这种情况下，尽可能多的移入<br>    c) 尝试谓词下推，然后尝试列消除，把外部查询中任何可以在子查询尽早被使用的谓词移入，并且子查询不提供外部查询不需要的任何列<br>    d) 计算修改后的计划的代价 C2 。如果 C1 <span class="hljs-operator">&lt;</span> C2，丢弃在步骤（b）和（c）中做的修改，否则保留它们<br></code></pre></td></tr></table></figure>
+
+<p>在上面这个过程中，产生出的派生表会被当作一个表加入到左深树中，每个派生表内部也是一个左深树，在全局上就形成了 Bushy Join。这个算法不需要获取表的基数或者谓词的选择率，只是通过连接图就可以找到可以被提取成派生表的地方。（Note：这里其实我有点没懂，在计算 Cost 的时候应该也是需要表的 cardinalities 和谓词的选择率的吧？）</p>
+<p>论文中对这个算法举的例子来自于 TPC-DS 的第 25 个查询：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SELECT</span> …<br><span class="hljs-keyword">FROM</span> store_sales ss,<br>     store_returns sr,<br>     catalog_sales cs,<br>     date_dim d1,<br>     date_dim d2,<br>     date_dim d3,<br>     store s,<br>     item i<br><span class="hljs-keyword">WHERE</span> d1.d_moy <span class="hljs-operator">=</span> <span class="hljs-number">4</span><br>    <span class="hljs-keyword">AND</span> d1.d_year <span class="hljs-operator">=</span> <span class="hljs-number">2000</span><br>    <span class="hljs-keyword">AND</span> d1.d_date_sk <span class="hljs-operator">=</span> ss_sold_date_sk<br>    <span class="hljs-keyword">AND</span> i_item_sk <span class="hljs-operator">=</span> ss_item_sk<br>    <span class="hljs-keyword">AND</span> s_store_sk <span class="hljs-operator">=</span> ss_store_sk<br>    <span class="hljs-keyword">AND</span> ss_customer_sk <span class="hljs-operator">=</span> sr_customer_sk<br>    <span class="hljs-keyword">AND</span> ss_item_sk <span class="hljs-operator">=</span> sr_item_sk<br>    <span class="hljs-keyword">AND</span> ss_ticket_number <span class="hljs-operator">=</span> sr_ticket_number<br>    <span class="hljs-keyword">AND</span> sr_returned_date_sk <span class="hljs-operator">=</span> d2.d_date_sk<br>    <span class="hljs-keyword">AND</span> d2.d_moy <span class="hljs-keyword">BETWEEN</span> <span class="hljs-number">4</span> <span class="hljs-keyword">AND</span> <span class="hljs-number">10</span><br>    <span class="hljs-keyword">AND</span> d2.d_year <span class="hljs-operator">=</span> <span class="hljs-number">2000</span><br>    <span class="hljs-keyword">AND</span> sr_customer_sk <span class="hljs-operator">=</span> cs_bill_customer_sk<br>    <span class="hljs-keyword">AND</span> sr_item_sk <span class="hljs-operator">=</span> cs_item_sk<br>    <span class="hljs-keyword">AND</span> cs_sold_date_sk <span class="hljs-operator">=</span> d3.d_date_sk<br>    <span class="hljs-keyword">AND</span> d3.d_moy <span class="hljs-keyword">BETWEEN</span> <span class="hljs-number">4</span> <span class="hljs-keyword">AND</span> <span class="hljs-number">10</span><br>    <span class="hljs-keyword">AND</span> d3.d_year <span class="hljs-operator">=</span> <span class="hljs-number">2000</span><br><span class="hljs-keyword">GROUP</span> <span class="hljs-keyword">BY</span> …<br><span class="hljs-keyword">ORDER</span> <span class="hljs-keyword">BY</span> …<br></code></pre></td></tr></table></figure>
+<p>这个查询的连接图为<br><img src="/2023/07/08/paper-reading-memsql/join-graph.jpg" srcset="/img/loading.gif" lazyload><br>其中， ss、sr、cs 是事实表，和它们对应的维度表连接后被一个谓词过滤。在分布式环境下，最优的左深树如图 2(a) 所示。所有的 join 都有连接谓词，除了 d3，因为 d3 只和 cs 有连接谓词。所以在连接到 d3 时，就会产生一个笛卡尔积，其代价是非常高的。但由于只能使用左深连接树，比起先连接 cs，由于 d3 有一个单表过滤条件，先连接 d3 会更好。</p>
+<p>在运行浓密连接的选择算法时，先找到候选卫星表 {d1, d2, d3}，再找到卫星表，也是 {d1, d2, d}。然后再找种子表，分别是 {ss, sr, cs}。然后重写器尝试把这些表整合成派生表加入到查询树中，并计算每种组合的代价，最后得到代价最小的查询树如图 2b 所示，对应的查询语句为：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SELECT</span> …<br><span class="hljs-keyword">FROM</span> store_sales,<br>     store_returns,<br>     date_dim d1,<br>     date_dim d2,<br>     store,<br>     item,<br>    (<span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span><br>        <span class="hljs-keyword">FROM</span> catalog_sales,<br>             date_dim d3<br>        <span class="hljs-keyword">WHERE</span> cs_sold_date_sk <span class="hljs-operator">=</span> d3.d_date_sk<br>        <span class="hljs-keyword">AND</span> d3.d_moy <span class="hljs-keyword">BETWEEN</span> <span class="hljs-number">4</span> <span class="hljs-keyword">AND</span> <span class="hljs-number">10</span><br>        <span class="hljs-keyword">AND</span> d3.d_year <span class="hljs-operator">=</span> <span class="hljs-number">2000</span>) sub<br><span class="hljs-keyword">WHERE</span> d1.d_moy <span class="hljs-operator">=</span> <span class="hljs-number">4</span><br>    <span class="hljs-keyword">AND</span> d1.d_year <span class="hljs-operator">=</span> <span class="hljs-number">2000</span><br>    <span class="hljs-keyword">AND</span> d1.d_date_sk <span class="hljs-operator">=</span> ss_sold_date_sk<br>    <span class="hljs-keyword">AND</span> i_item_sk <span class="hljs-operator">=</span> ss_item_sk<br>    <span class="hljs-keyword">AND</span> s_store_sk <span class="hljs-operator">=</span> ss_store_sk<br>    <span class="hljs-keyword">AND</span> ss_customer_sk <span class="hljs-operator">=</span> sr_customer_sk<br>    <span class="hljs-keyword">AND</span> ss_item_sk <span class="hljs-operator">=</span> sr_item_sk<br>    <span class="hljs-keyword">AND</span> ss_ticket_number <span class="hljs-operator">=</span> sr_ticket_number<br>    <span class="hljs-keyword">AND</span> sr_returned_date_sk <span class="hljs-operator">=</span> d2.d_date_sk<br>    <span class="hljs-keyword">AND</span> d2.d_moy <span class="hljs-keyword">BETWEEN</span> <span class="hljs-number">4</span> <span class="hljs-keyword">AND</span> <span class="hljs-number">10</span><br>    <span class="hljs-keyword">AND</span> d2.d_year <span class="hljs-operator">=</span> <span class="hljs-number">2000</span><br>    <span class="hljs-keyword">AND</span> sr_customer_sk <span class="hljs-operator">=</span> cs_bill_customer_sk<br>    <span class="hljs-keyword">AND</span> sr_item_sk <span class="hljs-operator">=</span> cs_item_sk<br><span class="hljs-keyword">GROUP</span> <span class="hljs-keyword">BY</span> …<br><span class="hljs-keyword">ORDER</span> <span class="hljs-keyword">BY</span> …<br></code></pre></td></tr></table></figure>
+
+<h2 id="Enumerator"><a href="#Enumerator" class="headerlink" title="Enumerator"></a>Enumerator</h2><h3 id="搜索过程"><a href="#搜索过程" class="headerlink" title="搜索过程"></a>搜索过程</h3><p>枚举器（Enumerator）负责连接重写器（Rewriter）和规划器（Planner），它接收重写器输出的查询操作树，然后确定查询的执行计划，包括分布式环境下数据的移动和 join 的顺序。重写器主要负责逻辑优化，而枚举器主要负责物理优化。MemSQL 的枚举器基于一个假设：将最优的串行计划做并行化并不能得到一个足够好的分布式查询计划。这个假设可以在上一节所举的例子中得到验证。因此枚举器在优化时需要考虑代价、表、网络、查询特性等等因素。枚举器其中一个关注点就在于，如何尽可能利用数据的共位连接（co-located join）以降低将数据在不同节点间传递的代价。同时，MemSQL 的枚举器需要考虑如何更好地优化同时涉及到行存和列存数据的查询。</p>
+<p>MemSQL 的枚举器在优化时只会在一个 Query Block 里面进行优化，而不会把一个查询块里的 join 移动到另一个查询块上执行（个人理解这个操作属于逻辑优化，应该在 Rewrite 阶段通过启发式规则或者基于代价的规则完成，在 Enumerate 阶段就假设能做的都已经做完了）。在优化时采用自底向上的方式，从最小的 Expression 开始优化，再优化该表达式的上层表达式（例如对于一个嵌套查询，先优化内层的子查询，再优化外层的查询）。当最外面的一层查询被优化完后，枚举器的优化过程就结束了。</p>
+<p>由于分布式条件下可能会涉及到不同节点间的数据移动，搜索空间会比单机查询优化的空间更大。为了限制搜索空间的大小，MemSQL 的优化器像  System-R 优化器一样，实现了一种带有 interesting properties 的动态规划算法。在 System-R 中，interesting properties 主要是算子的输出是否有序。在 MemSQL 中，interesting properties 主要是数据的分片。在进行等值 join 或者分组操作时，shard key 可能就会带来一些帮助。</p>
+<h3 id="分布式代价计算"><a href="#分布式代价计算" class="headerlink" title="分布式代价计算"></a>分布式代价计算</h3><p>论文还介绍了一下计算分布式代价的公式，主要包括两个操作：广播（Broadcast）和分区（Partition）。前者指的是把数据传输到每个节点上，后者指的是把每个执行节点上的数据根据指定的分区键进行重新分布（reshuffle）。广播的代价为 $R \times D$，分区的代价为 $\frac{1}{N}\times(R\times D + R\times H)$，其中 $R$ 是需要移动的数据行数，$D$ 是移动每行数据所需要的代价，$N$ 是集群中节点的个数，$H$ 是对每行数据计算哈希值的代价。</p>
+<h2 id="Planner"><a href="#Planner" class="headerlink" title="Planner"></a>Planner</h2><p>规划器（Planner）负责将枚举器输出的物理操作树变成分布式执行计划。执行计划由多个 DQEP Step 组成，每个 Step 都可以用类似 SQL 的文本表示。当调度节点将计划分发到每个执行节点上时，传输的内容就是一条条像 SQL 一样的文本。论文中解释这是因为 SQL 非常容易理解，并且使用 SQL 还可以在每个执行节点侧进行节点级别的优化和拓展。</p>
+<h3 id="Result-Table-和-Remote-Table"><a href="#Result-Table-和-Remote-Table" class="headerlink" title="Result Table 和 Remote Table"></a>Result Table 和 Remote Table</h3><p>为了支持使用 SQL 描述 DQEP Step，MemSQL 为 SQL 增加了两个拓展：<em>Remote Table</em> 和 <em>Result Table</em>。</p>
+<p>当一个查询需要让一个节点访问所有节点的数据时，就可以使用 <em>Remote Table</em> 关键字。例如下面这个 SQL</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SELECT</span> facts.id, facts.value<br><span class="hljs-keyword">FROM</span> REMOTE(facts) <span class="hljs-keyword">as</span> facts<br><span class="hljs-keyword">WHERE</span> facts.value <span class="hljs-operator">&gt;</span> <span class="hljs-number">4</span><br></code></pre></td></tr></table></figure>
+<p>其中 <code>REMOTE(facts)</code> 表明 facts 表中的数据不仅来源于本地的数据分区，还来自于集群中的其他节点。</p>
+<p>当一个集群中的所有节点都使用 Remote Table 访问数据时，很多工作会被重复多次，例如数据可能会被读或者计算多次。为了节省计算量，MemSQL 使用 <em>Result Table</em> 来让每个节点在本地保存一个临时表，表里的数据全部来源于本地分区。例如下面这个 SQL 就在每个节点上都创建了一个名为 facts_filtered 的表，每个节点上的 facts_filtered 表只包含自己本地 facts 表的数据。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">RESULT</span> <span class="hljs-keyword">TABLE</span> facts_filtered<br><span class="hljs-keyword">AS</span> <span class="hljs-keyword">SELECT</span> facts.id, facts.value<br>        <span class="hljs-keyword">FROM</span> facts<br>        <span class="hljs-keyword">WHERE</span> facts.value <span class="hljs-operator">&gt;</span> <span class="hljs-number">4</span><br></code></pre></td></tr></table></figure>
+<h3 id="对-DQEP-的描述"><a href="#对-DQEP-的描述" class="headerlink" title="对 DQEP 的描述"></a>对 DQEP 的描述</h3><p>DQEP 中涉及到很多对数据的移动和计算，这些都需要使用 SQL 表示出来。在 MemSQL 中，这是通过在 Result Table 内将这些操作连接起来实现的。DQEP 的每个阶段都由一个计算步骤表示，这个计算步骤会从上一个执行步骤中拉取数据，中间结果会用 Result Table 保存。Resul Table 不需要被物化，可以在执行时流式地进行计算和传递结果。</p>
+<h3 id="Broadcasts-的表示"><a href="#Broadcasts-的表示" class="headerlink" title="Broadcasts 的表示"></a>Broadcasts 的表示</h3><p>假设有这样一条 sql：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs sql"><span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> x <span class="hljs-keyword">JOIN</span> y <span class="hljs-keyword">WHERE</span> x.a <span class="hljs-operator">=</span> y.a <span class="hljs-keyword">AND</span> x.b <span class="hljs-operator">&lt;</span> <span class="hljs-number">2</span> <span class="hljs-keyword">AND</span> y.c <span class="hljs-operator">&gt;</span> <span class="hljs-number">5</span><br></code></pre></td></tr></table></figure>
+<p>如果 x 是根据 a 进行分片的而 y 不是，那么我们要么 reshuffle y 要么就广播 x。假如经过计算我们认为广播 x 代价更低，那么整个 DQEP 可以表示为</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs sql">(<span class="hljs-number">1</span>) <span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">RESULT</span> <span class="hljs-keyword">TABLE</span> r1 <span class="hljs-keyword">AS</span> <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> x <span class="hljs-keyword">WHERE</span> x.b <span class="hljs-operator">&lt;</span> <span class="hljs-number">2</span> (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br>(<span class="hljs-number">2</span>) <span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">RESULT</span> <span class="hljs-keyword">TABLE</span> r2 <span class="hljs-keyword">AS</span> <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> REMOTE(r1) (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> node)<br>(<span class="hljs-number">3</span>) <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> r2 <span class="hljs-keyword">JOIN</span> y <span class="hljs-keyword">WHERE</span> y.c <span class="hljs-operator">&gt;</span> <span class="hljs-number">5</span> <span class="hljs-keyword">AND</span> r2.a <span class="hljs-operator">=</span> y.a (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br></code></pre></td></tr></table></figure>
+<p>其中（1）在每个分区本地执行；（2）在每个节点执行，但是需要读取其他分区的 Result Table r1；（3）在每个分区执行，执行后将结果传输到调度节点汇总生成最后的结果。因为 Result Table 可以流式地创建和传输，因此整个查询执行时就是流式的。在执行（2）时，x 的数据就会被广播到整个集群。</p>
+<h3 id="Reshuffle-的表示"><a href="#Reshuffle-的表示" class="headerlink" title="Reshuffle 的表示"></a>Reshuffle 的表示</h3><p>还是前面那个查询，假如我们要 reshuffle y，那么 DQEP 可以表示为：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs sql">(<span class="hljs-number">1</span>) <span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">RESULT</span> <span class="hljs-keyword">TABLE</span> r1 <span class="hljs-keyword">PARTITION</span> <span class="hljs-keyword">BY</span> (y.a) <span class="hljs-keyword">AS</span> <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> y <span class="hljs-keyword">WHERE</span> y.c <span class="hljs-operator">&gt;</span> <span class="hljs-number">5</span> (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br>(<span class="hljs-number">2</span>) <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> x <span class="hljs-keyword">JOIN</span> REMOTE(r1(p)) <span class="hljs-keyword">WHERE</span> x.b <span class="hljs-operator">&lt;</span> <span class="hljs-number">2</span> <span class="hljs-keyword">AND</span> x.a <span class="hljs-operator">=</span> r1.a (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br></code></pre></td></tr></table></figure>
+<p>（1）将 y 中的每一行都根据 a 进行了重新分区。（1）完成后 x 和 y 都是根据 a 进行分片的，因此（2）可以在每个分区本地执行，然后将结果汇总到调度节点中。如果 x 和 y 都不是根据 a 进行分区的，那么可以对 x 和 y 都 reshuffle：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><code class="hljs sql">(<span class="hljs-number">1</span>) <span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">RESULT</span> <span class="hljs-keyword">TABLE</span> r1 <span class="hljs-keyword">PARTITION</span> <span class="hljs-keyword">BY</span> (x.a) <span class="hljs-keyword">AS</span> <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> x <span class="hljs-keyword">WHERE</span> x.b <span class="hljs-operator">&lt;</span> <span class="hljs-number">2</span> (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br>(<span class="hljs-number">2</span>) <span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">RESULT</span> <span class="hljs-keyword">TABLE</span> r2 <span class="hljs-keyword">PARTITION</span> <span class="hljs-keyword">BY</span> (y.a) <span class="hljs-keyword">AS</span> <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> y <span class="hljs-keyword">WHERE</span> y.c <span class="hljs-operator">&gt;</span> <span class="hljs-number">5</span> (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br>(<span class="hljs-number">3</span>) <span class="hljs-keyword">SELECT</span> <span class="hljs-operator">*</span> <span class="hljs-keyword">FROM</span> REMOTE(r1(p)) <span class="hljs-keyword">JOIN</span> REMOTE(r2(p)) <span class="hljs-keyword">WHERE</span> r1.a <span class="hljs-operator">=</span> r2.a (<span class="hljs-keyword">on</span> <span class="hljs-keyword">every</span> <span class="hljs-keyword">partition</span>)<br></code></pre></td></tr></table></figure>
+
+<h1 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h1><p>MemSQL 的查询优化器总体上就是 Rewrite + Physical Optimization + Plan Distribution。其中在 Rewrite 不仅使用了启发式规则，还使用了基于代价的规则，和 Oracle 的 CBQT 有点像。通过启发式规则在仅支持左深树的 Enumerator 的基础上引入 Bushy join 这一点比较特别。在物理优化时要考虑数据的分布和移动的情况，否则可能生成出较差的查询计划。在分发查询计划时，使用 SQL-like 的文本进行传输而不是将查询计划序列化之后分发，这一点是也是比较特别的。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/" class="category-chain-item">论文笔记</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/" class="category-chain-item">数据库</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/%E4%BC%98%E5%8C%96%E5%99%A8/" class="category-chain-item">优化器</a>
+  
+  
+
+  
+
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/">#论文笔记</a>
+      
+        <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">#数据库</a>
+      
+        <a href="/tags/%E6%9F%A5%E8%AF%A2%E4%BC%98%E5%8C%96%E5%99%A8/">#查询优化器</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>论文笔记：The MemSQL Query Optimizer: A modern optimizer for real-time analytics in a distributed database</div>
+      <div>https://thumarklau.github.io/2023/07/08/paper-reading-memsql/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2023年7月8日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="SA - 相同方式共享">
+                    <i class="iconfont icon-sa"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2023/07/14/paper-reading-calcite/" title="论文笔记：Apache Calcite: A Foundational Framework for Optimized Query Processing Over Heterogeneous Data Sources">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">论文笔记：Apache Calcite: A Foundational Framework for Optimized Query Processing Over Heterogeneous Data Sources</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2023/04/26/shell-tips/" title="ShellScript 的一些实用使用方法">
+                        <span class="hidden-mobile">ShellScript 的一些实用使用方法</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  
+      <script>
+        if (!window.MathJax) {
+          window.MathJax = {
+            tex    : {
+              inlineMath: { '[+]': [['$', '$']] }
+            },
+            loader : {
+              load: ['ui/lazy']
+            },
+            options: {
+              renderActions: {
+                insertedScript: [200, () => {
+                  document.querySelectorAll('mjx-container').forEach(node => {
+                    let target = node.parentNode;
+                    if (target.nodeName.toLowerCase() === 'li') {
+                      target.parentNode.classList.add('has-jax');
+                    }
+                  });
+                }, '', false]
+              }
+            }
+          };
+        } else {
+          MathJax.startup.document.state(0);
+          MathJax.texReset();
+          MathJax.typeset();
+          MathJax.typesetPromise();
+        }
+
+        Fluid.events.registerRefreshCallback(function() {
+          if ('MathJax' in window && MathJax.startup.document && typeof MathJax.startup.document.state === 'function') {
+            MathJax.startup.document.state(0);
+            MathJax.texReset();
+            MathJax.typeset();
+            MathJax.typesetPromise();
+          }
+        });
+      </script>
+    
+
+  <script  src="https://lib.baomitu.com/mathjax/3.2.2/es5/tex-mml-chtml.js" ></script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>

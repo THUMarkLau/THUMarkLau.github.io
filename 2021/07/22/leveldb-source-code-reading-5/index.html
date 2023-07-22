@@ -1,0 +1,854 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="MarkLau">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="在 LSM 结构的数据库中，SSTable 指的是数据落盘之后形成的文件。在 LevelDB 中，SSTable 是以 .sst 文件的形式存在的。本文将介绍 LevelDB 中 SSTable 的写过程和读过程。 SSTable 的总体结构  图中所示为 SSTable 文件的整体结构。文件的前部分为数据部分（DataBlock），文件的结尾部分为数据的索引。在索引部分，又分为了 Filter">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB 源代码阅读（五）：SSTable">
+<meta property="og:url" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/index.html">
+<meta property="og:site_name" content="马克刘的博客">
+<meta property="og:description" content="在 LSM 结构的数据库中，SSTable 指的是数据落盘之后形成的文件。在 LevelDB 中，SSTable 是以 .sst 文件的形式存在的。本文将介绍 LevelDB 中 SSTable 的写过程和读过程。 SSTable 的总体结构  图中所示为 SSTable 文件的整体结构。文件的前部分为数据部分（DataBlock），文件的结尾部分为数据的索引。在索引部分，又分为了 Filter">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-structrue.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-datablock-struct.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-datastruct.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-entrystruct.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-filter-block-struct.png">
+<meta property="og:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-indexblock-struct.png">
+<meta property="article:published_time" content="2021-07-22T13:32:19.000Z">
+<meta property="article:modified_time" content="2023-07-19T13:57:08.393Z">
+<meta property="article:author" content="MarkLau">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/SSTable-structrue.png">
+  
+  
+  
+  <title>LevelDB 源代码阅读（五）：SSTable - 马克刘的博客</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_hj8rtnfg7um.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"thumarklau.github.io","root":"/","version":"1.9.4","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"follow_dnt":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","app_key":"DS4jIGCnD88sjRFbPmROUtYi","server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+  
+
+
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>MarkLau&#39;s Blog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                <span>首页</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>归档</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                <span>分类</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>标签</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                <span>关于</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="LevelDB 源代码阅读（五）：SSTable"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2021-07-22 21:32" pubdate>
+          2021年7月22日 晚上
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          15k 字
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          123 分钟
+        
+      </span>
+    
+
+    
+    
+      
+        <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+          <i class="iconfont icon-eye" aria-hidden="true"></i>
+          <span id="leancloud-page-views"></span> 次
+        </span>
+        
+      
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">LevelDB 源代码阅读（五）：SSTable</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <p>在 LSM 结构的数据库中，SSTable 指的是数据落盘之后形成的文件。在 LevelDB 中，SSTable 是以 <em>.sst</em> 文件的形式存在的。本文将介绍 LevelDB 中 SSTable 的写过程和读过程。</p>
+<h1 id="SSTable-的总体结构"><a href="#SSTable-的总体结构" class="headerlink" title="SSTable 的总体结构"></a>SSTable 的总体结构</h1><img src="SSTable-structrue.png" srcset="/img/loading.gif" lazyload>
+
+<p>图中所示为 SSTable 文件的整体结构。文件的前部分为数据部分（DataBlock），文件的结尾部分为数据的索引。在索引部分，又分为了 Filter Block 、 Meta Index Block 、 Index Block 以及 Footer 。下面我们依次来介绍 SSTable 中每个结构的具体细节。</p>
+<h2 id="数据部分"><a href="#数据部分" class="headerlink" title="数据部分"></a>数据部分</h2><p>数据部分由许多个 DataBlock 组成，在 LevelDB 中，一个 DataBlock 的大小默认设置为 4 KB 。每个 DataBlock 由三个部分组成：数据部分（Data）、压缩类型（CompressionType）以及校验和（CRC）。</p>
+<img src="SSTable-datablock-struct.png" srcset="/img/loading.gif" lazyload>
+
+<p>Data 中存储的即是数据库的数据内容； CompressionType 中记录了对原始数据使用的压缩方式，在 LevelDB 中默认的压缩方式是 Snappy ； CRC 部分则记录了对 Data 以及 CompressionType 进行 CRC32 计算得到的结果，用来保证数据的正确性。</p>
+<p>Data 部分有更加细微的结构：</p>
+<img src="SSTable-datastruct.png" srcset="/img/loading.gif" lazyload>
+
+<p>图中每一个 Entry 就是一组 Key-Value 对，由于 DataBlock 在写入时，在一组键之间会寻找可以共享的长度（详见后面的写入过程），因此 Entry 块的后面会有若干个 Restart Point ，每个 Restart Point 会指向一个 Entry ，这个 Entry 不会与其前面的 Entry 有共享的键内容。每次读取数据时，都要从 Restart Point 指向的某个 Entry 开始往后读，直到读到目标键值对为止。最后，Data 中还标记了 Restart Point 的个数。前面提到，在编码是会对一组 Key 进行键值共享，因此一个 Entry 的结构为</p>
+<img src="SSTable-entrystruct.png" srcset="/img/loading.gif" lazyload>
+
+<h2 id="索引部分"><a href="#索引部分" class="headerlink" title="索引部分"></a>索引部分</h2><p>索引部分主要包含两大部分：数据的索引及元数据、布隆过滤器的索引及内容。</p>
+<h3 id="Filter-Block"><a href="#Filter-Block" class="headerlink" title="Filter Block"></a>Filter Block</h3><p>Filter Block 主要装载布隆过滤器的内容，所谓布隆过滤器就是一种用于快速模糊查找的数据结构，关于布隆过滤器的详细介绍可以查看这篇<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/43263751">文章</a>。</p>
+<img src="SSTable-filter-block-struct.png" srcset="/img/loading.gif" lazyload>
+
+<p>Filter Block 中的 Filter Data 块保存了布隆过滤器的具体内容；绿色部分的 Offset of Filter Data $i$ 则记录了第 $i$ 个 Filter Data 的偏移量；Offset of Filter Offset 则记录了 Offset of Filter Data 1 的偏移量；Base Lg 默认值为 11 ，表示每 2 KB 的数据创建一个新的过滤器来存放过滤数据。因此，Filter Data $i$ 就记录了文件中位置位于 [2KB $\times (i-1)$, 2KB $\times i$] 范围内数据的 Filter 数据。</p>
+<h3 id="Meta-Index-Block"><a href="#Meta-Index-Block" class="headerlink" title="Meta Index Block"></a>Meta Index Block</h3><p>Meta Index Block 用以记录 Filter Block 在整个 SSTable 中的位置，整个 Block 只记录了一组键值对，Key 为 “filter.” 与过滤器名称组成的常量字符串，值则为 Filter Block 的索引信息（包括 Filter Block 在 SSTable 中的偏移量以及 Filter Block 的数据长度）序列化后的内容。</p>
+<h3 id="Index-Block"><a href="#Index-Block" class="headerlink" title="Index Block"></a>Index Block</h3><p>Index Block 记录了数据部分的索引信息。具体地，Index Block 由多个 &lt;Max Key&gt;&lt;Offset&gt;&lt;Length&gt; 这样的三元组构成。一个三元组对应了数据部分的一个 DataBlock ，三元组中的信息分别记录了其最大键值、在文件中的偏移量以及大小三个信息。</p>
+<img src="SSTable-indexblock-struct.png" srcset="/img/loading.gif" lazyload>
+
+<p>在写入 DataBlock 的过程中，不同的 DataBlock 和 DataBlock 内部都是严格有序的（因为 MemTable 中的 SkipList 也是有序的），因此在查询时可以通过 IndexBlock 中记录的 MaxKey信息进行快速查找，然后根据 Offset 和 Length 信息将找到的 DataBlock 读取出来，再进行下一步的处理。</p>
+<h3 id="Footer"><a href="#Footer" class="headerlink" title="Footer"></a>Footer</h3><p>Footer 的大小是固定的，为 48 个字节，其存储了 MetaIndexBlock 的 offset、 IndexBlock 的 offset 以及一串 Magic Word ，内容为 “<a target="_blank" rel="noopener" href="http://code.google.com/p/leveldb/">http://code.google.com/p/leveldb/</a>“ 字符串 sha1 哈希的前 8 个字节。</p>
+<h1 id="SSTable-的写流程"><a href="#SSTable-的写流程" class="headerlink" title="SSTable 的写流程"></a>SSTable 的写流程</h1><p>在 LevelDB 中，Level 0 级的 SSTable 由内存中的 <em>Immutable MemTable</em> 写出得到，这个过程在 <em>db_impl.cc</em> 中的 <code>WriteLevel0Table</code> 中和主线程异步地执行。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// db_impl.cc</span><br><span class="hljs-function">Status <span class="hljs-title">DBImpl::WriteLevel0Table</span><span class="hljs-params">(MemTable* mem, VersionEdit* edit,</span></span><br><span class="hljs-params"><span class="hljs-function">                                Version* base)</span> </span>&#123;<br>  mutex_.<span class="hljs-built_in">AssertHeld</span>();<br>  <span class="hljs-type">const</span> <span class="hljs-type">uint64_t</span> start_micros = env_-&gt;<span class="hljs-built_in">NowMicros</span>();<br>  <span class="hljs-comment">// 生成文件元数据</span><br>  FileMetaData meta;<br>  meta.number = versions_-&gt;<span class="hljs-built_in">NewFileNumber</span>();<br>  pending_outputs_.<span class="hljs-built_in">insert</span>(meta.number);<br>  Iterator* iter = mem-&gt;<span class="hljs-built_in">NewIterator</span>();<br>  <span class="hljs-built_in">Log</span>(options_.info_log, <span class="hljs-string">&quot;Level-0 table #%llu: started&quot;</span>,<br>      (<span class="hljs-type">unsigned</span> <span class="hljs-type">long</span> <span class="hljs-type">long</span>)meta.number);<br><br>  Status s;<br>  &#123;<br>    mutex_.<span class="hljs-built_in">Unlock</span>();<br>    <span class="hljs-comment">// 将 Immutable MemTable 写入到文件中</span><br>    s = <span class="hljs-built_in">BuildTable</span>(dbname_, env_, options_, table_cache_, iter, &amp;meta);<br>    mutex_.<span class="hljs-built_in">Lock</span>();<br>  &#125;<br><br>  <span class="hljs-built_in">Log</span>(options_.info_log, <span class="hljs-string">&quot;Level-0 table #%llu: %lld bytes %s&quot;</span>,<br>      (<span class="hljs-type">unsigned</span> <span class="hljs-type">long</span> <span class="hljs-type">long</span>)meta.number, (<span class="hljs-type">unsigned</span> <span class="hljs-type">long</span> <span class="hljs-type">long</span>)meta.file_size,<br>      s.<span class="hljs-built_in">ToString</span>().<span class="hljs-built_in">c_str</span>());<br>  <span class="hljs-keyword">delete</span> iter;<br>  pending_outputs_.<span class="hljs-built_in">erase</span>(meta.number);<br><br>  <span class="hljs-comment">// Note that if file_size is zero, the file has been deleted and</span><br>  <span class="hljs-comment">// should not be added to the manifest.</span><br>  <span class="hljs-type">int</span> level = <span class="hljs-number">0</span>;<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>() &amp;&amp; meta.file_size &gt; <span class="hljs-number">0</span>) &#123;<br>    <span class="hljs-type">const</span> Slice min_user_key = meta.smallest.<span class="hljs-built_in">user_key</span>();<br>    <span class="hljs-type">const</span> Slice max_user_key = meta.largest.<span class="hljs-built_in">user_key</span>();<br>    <span class="hljs-keyword">if</span> (base != <span class="hljs-literal">nullptr</span>) &#123;<br>      <span class="hljs-comment">// 在所有无文件和该 SSTable 不发生 key 重叠的 Level 中</span><br>      <span class="hljs-comment">// 选择一个最大的 Level 插入该文件</span><br>      level = base-&gt;<span class="hljs-built_in">PickLevelForMemTableOutput</span>(min_user_key, max_user_key);<br>    &#125;<br>    <span class="hljs-comment">// 将文件加入到文件列表中</span><br>    edit-&gt;<span class="hljs-built_in">AddFile</span>(level, meta.number, meta.file_size, meta.smallest,<br>                  meta.largest);<br>  &#125;<br><br>  CompactionStats stats;<br>  stats.micros = env_-&gt;<span class="hljs-built_in">NowMicros</span>() - start_micros;<br>  stats.bytes_written = meta.file_size;<br>  stats_[level].<span class="hljs-built_in">Add</span>(stats);<br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>将 <em>MemTable</em> 中的内容写入到 SSTable 中的过程在 <code>BuildTable</code> 中</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// builder.cc</span><br><span class="hljs-function">Status <span class="hljs-title">BuildTable</span><span class="hljs-params">(<span class="hljs-type">const</span> std::string&amp; dbname, Env* env, <span class="hljs-type">const</span> Options&amp; options,</span></span><br><span class="hljs-params"><span class="hljs-function">                  TableCache* table_cache, Iterator* iter, FileMetaData* meta)</span> </span>&#123;<br>  Status s;<br>  meta-&gt;file_size = <span class="hljs-number">0</span>;<br>  <span class="hljs-comment">// 移动到 SkipList 中第一个元素的位置</span><br>  iter-&gt;<span class="hljs-built_in">SeekToFirst</span>();<br><br>  <span class="hljs-comment">// 创建文件</span><br>  std::string fname = <span class="hljs-built_in">TableFileName</span>(dbname, meta-&gt;number);<br>  <span class="hljs-keyword">if</span> (iter-&gt;<span class="hljs-built_in">Valid</span>()) &#123;<br>    WritableFile* file;<br>    s = env-&gt;<span class="hljs-built_in">NewWritableFile</span>(fname, &amp;file);<br>    <span class="hljs-keyword">if</span> (!s.<span class="hljs-built_in">ok</span>()) &#123;<br>      <span class="hljs-keyword">return</span> s;<br>    &#125;<br><br>    TableBuilder* builder = <span class="hljs-keyword">new</span> <span class="hljs-built_in">TableBuilder</span>(options, file);<br>    <span class="hljs-comment">// SkipList 中的数据是按照顺序排列的</span><br>    <span class="hljs-comment">// 因此第一个键就是其最小的键</span><br>    meta-&gt;smallest.<span class="hljs-built_in">DecodeFrom</span>(iter-&gt;<span class="hljs-built_in">key</span>());<br>    Slice key;<br>    <span class="hljs-comment">// 不断地将 SkipList 中的数据插入到 TableBuilder 中</span><br>    <span class="hljs-keyword">for</span> (; iter-&gt;<span class="hljs-built_in">Valid</span>(); iter-&gt;<span class="hljs-built_in">Next</span>()) &#123;<br>      key = iter-&gt;<span class="hljs-built_in">key</span>();<br>      builder-&gt;<span class="hljs-built_in">Add</span>(key, iter-&gt;<span class="hljs-built_in">value</span>());<br>    &#125;<br>    <span class="hljs-comment">// 最后一个键就是最大的键</span><br>    <span class="hljs-keyword">if</span> (!key.<span class="hljs-built_in">empty</span>()) &#123;<br>      meta-&gt;largest.<span class="hljs-built_in">DecodeFrom</span>(key);<br>    &#125;<br><br>    <span class="hljs-comment">// Finish and check for builder errors</span><br>    <span class="hljs-comment">// Finish 时会写入索引部分的数据</span><br>    <span class="hljs-comment">// 包括 FilterBlock、MetaIndexBlock、IndexBlock 以及 Footer</span><br>    s = builder-&gt;<span class="hljs-built_in">Finish</span>();<br>    <br>    <span class="hljs-comment">// 一些检查文件状态的代码</span><br>    ...<br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在 <code>BuildTable</code> 函数中， <em>MemTable</em> 中的内容被不断添加到 <em>TableBuilder</em> 中。当 <em>MemTable</em> 中的数据都被添加到了 <em>TableBuilder</em> 中后，SSTable 中数据部分就已经写入完成了。随后调用 <em>TableBuilder</em> 的 <code>Finish</code> 函数，这个函数会写入索引部分的块，包括 FilterBlock（可选）、 MetaIndexBlock、 IndexBlock 以及 Footer 。写入完成后，程序会对新生成文件的状态进行一些检查，通过检查后文件会被添加到内存的文件列表中，供查询使用。</p>
+<p>下面我们看看数据在 <em>TableBuilder</em> 中是如何被编码的：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// table_builder.cc</span><br><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">TableBuilder::Add</span><span class="hljs-params">(<span class="hljs-type">const</span> Slice&amp; key, <span class="hljs-type">const</span> Slice&amp; value)</span> </span>&#123;<br>  Rep* r = rep_;<br>  <span class="hljs-built_in">assert</span>(!r-&gt;closed);<br>  <span class="hljs-keyword">if</span> (!<span class="hljs-built_in">ok</span>()) <span class="hljs-keyword">return</span>;<br>  <span class="hljs-comment">// 保证插入是有序的</span><br>  <span class="hljs-keyword">if</span> (r-&gt;num_entries &gt; <span class="hljs-number">0</span>) &#123;<br>    <span class="hljs-built_in">assert</span>(r-&gt;options.comparator-&gt;<span class="hljs-built_in">Compare</span>(key, <span class="hljs-built_in">Slice</span>(r-&gt;last_key)) &gt; <span class="hljs-number">0</span>);<br>  &#125;<br><br>  <span class="hljs-comment">// 如果当前内存中的 Block 是空的，那么就为这个 Block 生成一个 IndexKey</span><br>  <span class="hljs-comment">// 这个 IndexKey 不一定会出现在用户写入的数据中，而是根据计算得出的</span><br>  <span class="hljs-comment">// 可以将这个 Block 和上一个 Block 分开的最短的 Key</span><br>  <span class="hljs-comment">// 例如上一个 Block 的 IndexKey 是 &quot;the great&quot;， 当前 Block 插入的第一个</span><br>  <span class="hljs-comment">// key 为 &quot;the hello&quot; ，那么这个 IndexKey 需要满足</span><br>  <span class="hljs-comment">// &quot;the great&quot; &lt; IndexKey &lt;= &quot;the hello&quot;</span><br>  <span class="hljs-comment">// 例如，其值可能是 &quot;the h&quot;</span><br>  <span class="hljs-keyword">if</span> (r-&gt;pending_index_entry) &#123;<br>    <span class="hljs-built_in">assert</span>(r-&gt;data_block.<span class="hljs-built_in">empty</span>());<br>    r-&gt;options.comparator-&gt;<span class="hljs-built_in">FindShortestSeparator</span>(&amp;r-&gt;last_key, key);<br>    std::string handle_encoding;<br>    r-&gt;pending_handle.<span class="hljs-built_in">EncodeTo</span>(&amp;handle_encoding);<br>    <span class="hljs-comment">// 将这个 IndexKey 记录到 index block 中</span><br>    r-&gt;index_block.<span class="hljs-built_in">Add</span>(r-&gt;last_key, <span class="hljs-built_in">Slice</span>(handle_encoding));<br>    r-&gt;pending_index_entry = <span class="hljs-literal">false</span>;<br>  &#125;<br><br>  <span class="hljs-comment">// 如果需要生成 BloomFilter ，则将这个数据编码进 BloomFilter 中</span><br>  <span class="hljs-keyword">if</span> (r-&gt;filter_block != <span class="hljs-literal">nullptr</span>) &#123;<br>    r-&gt;filter_block-&gt;<span class="hljs-built_in">AddKey</span>(key);<br>  &#125;<br><br>  r-&gt;last_key.<span class="hljs-built_in">assign</span>(key.<span class="hljs-built_in">data</span>(), key.<span class="hljs-built_in">size</span>());<br>  r-&gt;num_entries++;<br>  <span class="hljs-comment">// 将数据编码进 DataBlock 中</span><br>  r-&gt;data_block.<span class="hljs-built_in">Add</span>(key, value);<br><br>  <span class="hljs-type">const</span> <span class="hljs-type">size_t</span> estimated_block_size = r-&gt;data_block.<span class="hljs-built_in">CurrentSizeEstimate</span>();<br>  <span class="hljs-comment">// 如果 DataBlock 的大小大于阈值（默认为 4KB），则将这个 DataBlock 刷到磁盘上</span><br>  <span class="hljs-keyword">if</span> (estimated_block_size &gt;= r-&gt;options.block_size) &#123;<br>    <span class="hljs-built_in">Flush</span>();<br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在这里，数据还是没有被直接编码，而是被插入到了 <em>DataBlock</em> 中。如果一个 <em>DataBlock</em> 的大小超过了阈值（默认为 4KB），那么它就会被刷到文件中。除了插入数据，<code>Add</code> 函数还做了其他的事情：在 <em>IndexBlock</em> 中为本 <em>DataBlock</em> 生成一个 <em>IndexKey</em> ，这个 <em>IndexKey</em> 不一定会出现在用户插入的数据中，而是一个计算出来的最短的可以区别两个 <em>DataBlock</em> 的 key 。如果用户在配置中开启了布隆过滤器，那么在这个函数中也会将 key 编码到 <em>FilterBlock</em> 中。</p>
+<p>在 <em>DataBlock</em> 的 <code>Add</code> 函数中，真正执行了对数据的编码。下面我们来看看这个函数是如何执行的。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// block_builder.cc</span><br><span class="hljs-comment">// BlockBuilder 会寻找不同 key 之间可以共享的部分，以此进行压缩</span><br><span class="hljs-comment">// 压缩只会对 key 进行，不会对 value 进行</span><br><span class="hljs-comment">// 压缩后的格式为</span><br><span class="hljs-comment">// &lt;与前一个 key 的共享长度&gt;&lt;不共享的长度&gt;&lt;value 的长度&gt;&lt;key 不共享的部分&gt;&lt;value&gt;</span><br><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">BlockBuilder::Add</span><span class="hljs-params">(<span class="hljs-type">const</span> Slice&amp; key, <span class="hljs-type">const</span> Slice&amp; value)</span> </span>&#123;<br>  <span class="hljs-function">Slice <span class="hljs-title">last_key_piece</span><span class="hljs-params">(last_key_)</span></span>;<br>  <span class="hljs-built_in">assert</span>(!finished_);<br>  <span class="hljs-built_in">assert</span>(counter_ &lt;= options_-&gt;block_restart_interval);<br>  <span class="hljs-built_in">assert</span>(buffer_.<span class="hljs-built_in">empty</span>()  <span class="hljs-comment">// No values yet?</span><br>         || options_-&gt;comparator-&gt;<span class="hljs-built_in">Compare</span>(key, last_key_piece) &gt; <span class="hljs-number">0</span>);<br>  <span class="hljs-comment">// 如果当前共享内容的键数目没有达到阈值，就寻找当前键和上一个键之间重叠的部分</span><br>  <span class="hljs-type">size_t</span> shared = <span class="hljs-number">0</span>;<br>  <span class="hljs-keyword">if</span> (counter_ &lt; options_-&gt;block_restart_interval) &#123;<br>    <span class="hljs-comment">// See how much sharing to do with previous string</span><br>    <span class="hljs-type">const</span> <span class="hljs-type">size_t</span> min_length = std::<span class="hljs-built_in">min</span>(last_key_piece.<span class="hljs-built_in">size</span>(), key.<span class="hljs-built_in">size</span>());<br>    <span class="hljs-keyword">while</span> ((shared &lt; min_length) &amp;&amp; (last_key_piece[shared] == key[shared])) &#123;<br>      shared++;<br>    &#125;<br>  &#125; <span class="hljs-keyword">else</span> &#123;<br>    <span class="hljs-comment">// Restart compression</span><br>    restarts_.<span class="hljs-built_in">push_back</span>(buffer_.<span class="hljs-built_in">size</span>());<br>    counter_ = <span class="hljs-number">0</span>;<br>  &#125;<br>  <span class="hljs-comment">// 当前键和上一个键不重叠的大小</span><br>  <span class="hljs-type">const</span> <span class="hljs-type">size_t</span> non_shared = key.<span class="hljs-built_in">size</span>() - shared;<br><br>  <span class="hljs-comment">// 将 &quot;&lt;shared&gt;&lt;non_shared&gt;&lt;value_size&gt;&quot; 编码到 buffer_ 中</span><br>  <span class="hljs-built_in">PutVarint32</span>(&amp;buffer_, shared);<br>  <span class="hljs-built_in">PutVarint32</span>(&amp;buffer_, non_shared);<br>  <span class="hljs-built_in">PutVarint32</span>(&amp;buffer_, value.<span class="hljs-built_in">size</span>());<br><br>  <span class="hljs-comment">// 将当前键不共享的部分以及 value 的内容编码到 buffer_ 中</span><br>  buffer_.<span class="hljs-built_in">append</span>(key.<span class="hljs-built_in">data</span>() + shared, non_shared);<br>  buffer_.<span class="hljs-built_in">append</span>(value.<span class="hljs-built_in">data</span>(), value.<span class="hljs-built_in">size</span>());<br><br>  <span class="hljs-comment">// 更新 last_key_</span><br>  last_key_.<span class="hljs-built_in">resize</span>(shared);<br>  last_key_.<span class="hljs-built_in">append</span>(key.<span class="hljs-built_in">data</span>() + shared, non_shared);<br>  <span class="hljs-built_in">assert</span>(<span class="hljs-built_in">Slice</span>(last_key_) == key);<br>  counter_++;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在 <em>BlockBuilder</em> 中，所有的数据都被一起编码到一个 buffer 中。但是中编码之前，程序会对 key 进行一次压缩。这个压缩是通过寻找当前 key 和上一个 key 之间共同的长度来完成的。当然，这个共享不会无限进行下去，每隔若干个 key ，程序会就重新开始计算共享键。例如，如果系统设置的共享键数目是 16 （默认值），那么第 1 个到第 16 个 key 之间是有内容共享的，第 16 个和第 17 个键则不计算其共享的内容，第 17 个键到第 32 键之间又继续计算其共享内容。这是因为最终数据会被编码成</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs apache"><span class="hljs-section">&lt;SharedKeyLength&gt;</span> <span class="hljs-section">&lt;NonSharedKeyLength&gt;</span> <span class="hljs-section">&lt;ValueLength&gt;</span> <span class="hljs-section">&lt;NonSharedKeyContent&gt;</span> <span class="hljs-section">&lt;ValueContent&gt;</span><br></code></pre></td></tr></table></figure>
+<p>的形式，因此读取一个键时，只能知道它与前一个键不共享部分的内容，如果要读取其完整值，则必须知道它与前一个键共享的内容。因此，我们需要一直往前找，直到找到一个 SharedKeyLength 为 0 的 key ，然后往后读，一直读到我们需要的 key 为止。如果整个 <em>DataBlock</em> 都一起共享键，那么每次我们读取一个键都要从这个 <em>DataBlock</em> 的第一个键开始读，效率非常低。为了避免这种情况， <em>DataBlock</em> 中键值的共享在每一个 Entry 中进行，每 16 个键（默认值）保存在一个 Entry 中，并且为每个 Entry 在文件中维护了一个 Restart Point ，用于指向这个 Entry 。这样，在读取一个 Key 时，只需要找到这个 Key 所在的 Entry ，然后从这个 Entry 的第一个 Key 开始读即可。这样在读取一个 Key 时既不会读取太多其他的 Key ，也可以有效压缩 Key 的大小 。最后需要注意的是，这里通过共享值的压缩方法只会对 Key 进行，对于 Value 则是不做任何处理直接编码进 buffer 中。</p>
+<h1 id="SSTable-的读流程"><a href="#SSTable-的读流程" class="headerlink" title="SSTable 的读流程"></a>SSTable 的读流程</h1><p><em>SSTable</em> 的读流程其实就是写流程的逆过程。读流程的入口在 <em>table_cache.cc</em> 中的 <code>FindTable</code> 函数中。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// table_cache.cc</span><br><span class="hljs-function">Status <span class="hljs-title">TableCache::FindTable</span><span class="hljs-params">(<span class="hljs-type">uint64_t</span> file_number, <span class="hljs-type">uint64_t</span> file_size,</span></span><br><span class="hljs-params"><span class="hljs-function">                             Cache::Handle** handle)</span> </span>&#123;<br>  Status s;<br>  <span class="hljs-type">char</span> buf[<span class="hljs-built_in">sizeof</span>(file_number)];<br>  <span class="hljs-built_in">EncodeFixed64</span>(buf, file_number);<br>  <span class="hljs-function">Slice <span class="hljs-title">key</span><span class="hljs-params">(buf, <span class="hljs-keyword">sizeof</span>(buf))</span></span>;<br>  <span class="hljs-comment">// 在 Cache 中查找是否缓存 SSTable 的 handle</span><br>  *handle = cache_-&gt;<span class="hljs-built_in">Lookup</span>(key);<br>  <span class="hljs-keyword">if</span> (*handle == <span class="hljs-literal">nullptr</span>) &#123;<br>  	<span class="hljs-comment">// 如果没有缓存，就从磁盘中打开这个 SSTable</span><br>    std::string fname = <span class="hljs-built_in">TableFileName</span>(dbname_, file_number);<br>    RandomAccessFile* file = <span class="hljs-literal">nullptr</span>;<br>    Table* table = <span class="hljs-literal">nullptr</span>;<br>    s = env_-&gt;<span class="hljs-built_in">NewRandomAccessFile</span>(fname, &amp;file);<br>    <span class="hljs-keyword">if</span> (!s.<span class="hljs-built_in">ok</span>()) &#123;<br>      std::string old_fname = <span class="hljs-built_in">SSTTableFileName</span>(dbname_, file_number);<br>      <span class="hljs-keyword">if</span> (env_-&gt;<span class="hljs-built_in">NewRandomAccessFile</span>(old_fname, &amp;file).<span class="hljs-built_in">ok</span>()) &#123;<br>        s = Status::<span class="hljs-built_in">OK</span>();<br>      &#125;<br>    &#125;<br>    <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    	<span class="hljs-comment">// 打开文件，读取内容</span><br>      s = Table::<span class="hljs-built_in">Open</span>(options_, file, file_size, &amp;table);<br>    &#125;<br><br>    <span class="hljs-comment">// some check codes</span><br>    ...<br>  &#125;<br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>在读取一个文件之前，程序首先会在 <em>TableCache</em> 查找有无该文件的 handle ，如果没有，才会从磁盘中读取这个文件。 <code>Table::Open</code> 函数从磁盘上读取这个文件的 <em>Footer</em> 和 <em>IndexBlock</em> ，如果文件有 <em>FilterBlock</em>，也会将 <em>MetaIndexBlock</em> 读入内存中。当这些数据都被读完后，程序会对读取的状态进行一些检查，通过检查后这个文件的 handle 就会被缓存在 <em>TableCache</em> 中，供其他过程使用。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// table.cc</span><br><span class="hljs-function">Status <span class="hljs-title">Table::Open</span><span class="hljs-params">(<span class="hljs-type">const</span> Options&amp; options, RandomAccessFile* file,</span></span><br><span class="hljs-params"><span class="hljs-function">                   <span class="hljs-type">uint64_t</span> size, Table** table)</span> </span>&#123;<br>  *table = <span class="hljs-literal">nullptr</span>;<br>  <span class="hljs-keyword">if</span> (size &lt; Footer::kEncodedLength) &#123;<br>    <span class="hljs-keyword">return</span> Status::<span class="hljs-built_in">Corruption</span>(<span class="hljs-string">&quot;file is too short to be an sstable&quot;</span>);<br>  &#125;<br><br>  <span class="hljs-comment">// 读取 footer</span><br>  <span class="hljs-type">char</span> footer_space[Footer::kEncodedLength];<br>  Slice footer_input;<br>  Status s = file-&gt;<span class="hljs-built_in">Read</span>(size - Footer::kEncodedLength, Footer::kEncodedLength,<br>                        &amp;footer_input, footer_space);<br>  <span class="hljs-keyword">if</span> (!s.<span class="hljs-built_in">ok</span>()) <span class="hljs-keyword">return</span> s;<br><br>  Footer footer;<br>  s = footer.<span class="hljs-built_in">DecodeFrom</span>(&amp;footer_input);<br>  <span class="hljs-keyword">if</span> (!s.<span class="hljs-built_in">ok</span>()) <span class="hljs-keyword">return</span> s;<br><br>  <span class="hljs-comment">// 读取 index block</span><br>  BlockContents index_block_contents;<br>  ReadOptions opt;<br>  <span class="hljs-keyword">if</span> (options.paranoid_checks) &#123;<br>    opt.verify_checksums = <span class="hljs-literal">true</span>;<br>  &#125;<br>  s = <span class="hljs-built_in">ReadBlock</span>(file, opt, footer.<span class="hljs-built_in">index_handle</span>(), &amp;index_block_contents);<br><br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    <span class="hljs-comment">// We&#x27;ve successfully read the footer and the index block: we&#x27;re</span><br>    <span class="hljs-comment">// ready to serve requests.</span><br>    Block* index_block = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Block</span>(index_block_contents);<br>    Rep* rep = <span class="hljs-keyword">new</span> Table::Rep;<br>    rep-&gt;options = options;<br>    rep-&gt;file = file;<br>    rep-&gt;metaindex_handle = footer.<span class="hljs-built_in">metaindex_handle</span>();<br>    rep-&gt;index_block = index_block;<br>    rep-&gt;cache_id = (options.block_cache ? options.block_cache-&gt;<span class="hljs-built_in">NewId</span>() : <span class="hljs-number">0</span>);<br>    rep-&gt;filter_data = <span class="hljs-literal">nullptr</span>;<br>    rep-&gt;filter = <span class="hljs-literal">nullptr</span>;<br>    <span class="hljs-comment">// 生成新的 Table 对象，并且读取 BloomFilter</span><br>    *table = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Table</span>(rep);<br>    (*table)-&gt;<span class="hljs-built_in">ReadMeta</span>(footer);<br>  &#125;<br><br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>上面是在 <code>Open</code> 函数中读取文件 <em>Footer</em> 和 <em>IndexBlock</em> 的代码，在 <code>table-&gt;ReadMeta</code> 中会读取文件的 <em>MetaIndexBlock</em>（如果存在的话）。</p>
+<p>至此，一个文件的索引部分（除了 FilterBlock ）已经被加载到了内存中。下面让我们看看当我们需要从已经加载到了内存中的文件里读取一个具体的 Key 需要经过怎样的流程。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// table.cc</span><br><span class="hljs-function">Status <span class="hljs-title">Table::InternalGet</span><span class="hljs-params">(<span class="hljs-type">const</span> ReadOptions&amp; options, <span class="hljs-type">const</span> Slice&amp; k, <span class="hljs-type">void</span>* arg,</span></span><br><span class="hljs-params"><span class="hljs-function">                          <span class="hljs-type">void</span> (*handle_result)(<span class="hljs-type">void</span>*, <span class="hljs-type">const</span> Slice&amp;,</span></span><br><span class="hljs-params"><span class="hljs-function">                                                <span class="hljs-type">const</span> Slice&amp;))</span> </span>&#123;<br>  Status s;<br>  <span class="hljs-comment">// 从 IndexBlock 中找到可能保存搜索键 k 的 dataBlock 对应的 IndexKey</span><br>  Iterator* iiter = rep_-&gt;index_block-&gt;<span class="hljs-built_in">NewIterator</span>(rep_-&gt;options.comparator);<br>  iiter-&gt;<span class="hljs-built_in">Seek</span>(k);<br>  <span class="hljs-keyword">if</span> (iiter-&gt;<span class="hljs-built_in">Valid</span>()) &#123;<br>    Slice handle_value = iiter-&gt;<span class="hljs-built_in">value</span>();<br>    FilterBlockReader* filter = rep_-&gt;filter;<br>    BlockHandle handle;<br>    <span class="hljs-keyword">if</span> (filter != <span class="hljs-literal">nullptr</span> &amp;&amp; handle.<span class="hljs-built_in">DecodeFrom</span>(&amp;handle_value).<span class="hljs-built_in">ok</span>() &amp;&amp;<br>        !filter-&gt;<span class="hljs-built_in">KeyMayMatch</span>(handle.<span class="hljs-built_in">offset</span>(), k)) &#123;<br>    	<span class="hljs-comment">// 如果 bloomFilter 存在，并且 BloomFilter 指示不存在这个 key ，查找失败</span><br>      <span class="hljs-comment">// Not found</span><br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>    	<span class="hljs-comment">// 构建一个前面在 IndexBlock 中找到的目标 Block 的 iterator</span><br>      Iterator* block_iter = <span class="hljs-built_in">BlockReader</span>(<span class="hljs-keyword">this</span>, options, iiter-&gt;<span class="hljs-built_in">value</span>());<br>      <span class="hljs-comment">// 通过 block iterator 查找键</span><br>      block_iter-&gt;<span class="hljs-built_in">Seek</span>(k);<br>      <span class="hljs-keyword">if</span> (block_iter-&gt;<span class="hljs-built_in">Valid</span>()) &#123;<br>        (*handle_result)(arg, block_iter-&gt;<span class="hljs-built_in">key</span>(), block_iter-&gt;<span class="hljs-built_in">value</span>());<br>      &#125;<br>      s = block_iter-&gt;<span class="hljs-built_in">status</span>();<br>      <span class="hljs-keyword">delete</span> block_iter;<br>    &#125;<br>  &#125;<br>  <span class="hljs-keyword">if</span> (s.<span class="hljs-built_in">ok</span>()) &#123;<br>    s = iiter-&gt;<span class="hljs-built_in">status</span>();<br>  &#125;<br>  <span class="hljs-keyword">delete</span> iiter;<br>  <span class="hljs-keyword">return</span> s;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p><code>Table::InternalGet</code> 函数完成了在 <em>SSTable</em> 中查找的过程。首先程序会从 <em>IndexBlock</em> 找到可能保存搜索键 k 的 <em>DataBlock</em> 的 IndexKey （因为 <em>DataBlock</em> 是有序存放的，因此用二分查找即可找到），然后检查是否有布隆过滤器，有的话检查布隆过滤器中是否编码了这个键，如果没编码，那么代表这个数据不存在于这个 <em>SSTable</em> 中，查找失败；否则，如果布隆过滤器不存在或者布隆过滤器中编码了这一个 key ，那么就对前面在 <em>IndexBlock</em> 查找到的指向的 <em>DataBlock</em> 新建一个 iterator ，然后通过这个 iterator 找到这个键。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// block.cc</span><br><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Seek</span><span class="hljs-params">(<span class="hljs-type">const</span> Slice&amp; target)</span> <span class="hljs-keyword">override</span> </span>&#123;<br>  <span class="hljs-comment">// Binary search in restart array to find the last restart point</span><br>  <span class="hljs-comment">// with a key &lt; target</span><br>  <span class="hljs-type">uint32_t</span> left = <span class="hljs-number">0</span>;<br>  <span class="hljs-type">uint32_t</span> right = num_restarts_ - <span class="hljs-number">1</span>;<br>  <span class="hljs-type">int</span> current_key_compare = <span class="hljs-number">0</span>;<br><br>  <span class="hljs-comment">// 如果已经进行过查找了，那么就检查上一轮查找最终结束的位置是在当前 key 的左边还是右边</span><br>  <span class="hljs-keyword">if</span> (<span class="hljs-built_in">Valid</span>()) &#123;<br>    <span class="hljs-comment">// If we&#x27;re already scanning, use the current position as a starting</span><br>    <span class="hljs-comment">// point. This is beneficial if the key we&#x27;re seeking to is ahead of the</span><br>    <span class="hljs-comment">// current position.</span><br>    current_key_compare = <span class="hljs-built_in">Compare</span>(key_, target);<br>    <span class="hljs-keyword">if</span> (current_key_compare &lt; <span class="hljs-number">0</span>) &#123;<br>      <span class="hljs-comment">// key_ is smaller than target</span><br>      left = restart_index_;<br>    &#125; <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (current_key_compare &gt; <span class="hljs-number">0</span>) &#123;<br>      right = restart_index_;<br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>      <span class="hljs-comment">// We&#x27;re seeking to the key we&#x27;re already at.</span><br>      <span class="hljs-keyword">return</span>;<br>    &#125;<br>  &#125;<br><br>  <span class="hljs-comment">// 使用二分查找寻找这个 key 所在的位置</span><br>  <span class="hljs-keyword">while</span> (left &lt; right) &#123;<br>    <span class="hljs-type">uint32_t</span> mid = (left + right + <span class="hljs-number">1</span>) / <span class="hljs-number">2</span>;<br>    <span class="hljs-type">uint32_t</span> region_offset = <span class="hljs-built_in">GetRestartPoint</span>(mid);<br>    <span class="hljs-type">uint32_t</span> shared, non_shared, value_length;<br>    <span class="hljs-type">const</span> <span class="hljs-type">char</span>* key_ptr =<br>        <span class="hljs-built_in">DecodeEntry</span>(data_ + region_offset, data_ + restarts_, &amp;shared,<br>                    &amp;non_shared, &amp;value_length);<br>    <span class="hljs-keyword">if</span> (key_ptr == <span class="hljs-literal">nullptr</span> || (shared != <span class="hljs-number">0</span>)) &#123;<br>      <span class="hljs-built_in">CorruptionError</span>();<br>      <span class="hljs-keyword">return</span>;<br>    &#125;<br>    <span class="hljs-function">Slice <span class="hljs-title">mid_key</span><span class="hljs-params">(key_ptr, non_shared)</span></span>;<br>    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">Compare</span>(mid_key, target) &lt; <span class="hljs-number">0</span>) &#123;<br>      <span class="hljs-comment">// Key at &quot;mid&quot; is smaller than &quot;target&quot;.  Therefore all</span><br>      <span class="hljs-comment">// blocks before &quot;mid&quot; are uninteresting.</span><br>      left = mid;<br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>      <span class="hljs-comment">// Key at &quot;mid&quot; is &gt;= &quot;target&quot;.  Therefore all blocks at or</span><br>      <span class="hljs-comment">// after &quot;mid&quot; are uninteresting.</span><br>      right = mid - <span class="hljs-number">1</span>;<br>    &#125;<br>  &#125;<br><br>  <span class="hljs-comment">// We might be able to use our current position within the restart block.</span><br>  <span class="hljs-comment">// This is true if we determined the key we desire is in the current block</span><br>  <span class="hljs-comment">// and is after than the current key.</span><br>  <span class="hljs-built_in">assert</span>(current_key_compare == <span class="hljs-number">0</span> || <span class="hljs-built_in">Valid</span>());<br>  <span class="hljs-comment">// 如果我们当前已经在这个 RestartPoint 指向的 Entry 里了（上一次查找）</span><br>  <span class="hljs-comment">// 并且我们要找的键就在这个 Entry 中，那么我们就可以不用 seek</span><br>  <span class="hljs-type">bool</span> skip_seek = left == restart_index_ &amp;&amp; current_key_compare &lt; <span class="hljs-number">0</span>;<br>  <span class="hljs-keyword">if</span> (!skip_seek) &#123;<br>  	<span class="hljs-comment">// 跳转到 key 所在的 RestartPoint 指向的 Entry</span><br>    <span class="hljs-built_in">SeekToRestartPoint</span>(left);<br>  &#125;<br>  <span class="hljs-comment">// 在一个 Entry 中从头往后读</span><br>  <span class="hljs-comment">// Linear search (within restart block) for first key &gt;= target</span><br>  <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) &#123;<br>    <span class="hljs-keyword">if</span> (!<span class="hljs-built_in">ParseNextKey</span>()) &#123;<br>      <span class="hljs-keyword">return</span>;<br>    &#125;<br>    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">Compare</span>(key_, target) &gt;= <span class="hljs-number">0</span>) &#123;<br>      <span class="hljs-keyword">return</span>;<br>    &#125;<br>  &#125;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>上面这段代码就是在 <em>BlockIterator</em> 中查找搜索 key 的过程。函数的主体是一个二分搜索，找到这个 key 所在的 Entry ，然后从这个 Entry 的第一个键开始顺序地往下读，直到读到我们要查找的 key 为止。</p>
+<p>到这里 SSTable 的读写过程就解析完了，这里值得体会的是对文件分块分层次组织的过程，从 SSTable 到 DataBlock 再到 Entry ，多个数据层次使得文件写和文件读可以更高效。同时，将索引和数据放在一个文件里，使得索引和数据在删除与移动时都是一体的。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" class="category-chain-item">数据库</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/" class="category-chain-item">源代码阅读</a>
+  
+  
+    <span>></span>
+    
+  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/%E6%BA%90%E4%BB%A3%E7%A0%81%E9%98%85%E8%AF%BB/LevelDB/" class="category-chain-item">LevelDB</a>
+  
+  
+
+  
+
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>LevelDB 源代码阅读（五）：SSTable</div>
+      <div>https://thumarklau.github.io/2021/07/22/leveldb-source-code-reading-5/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>作者</div>
+          <div>MarkLau</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>发布于</div>
+          <div>2021年7月22日</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>许可协议</div>
+          <div>
+            
+              
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - 署名">
+                    <i class="iconfont icon-by"></i>
+                  </span>
+                </a>
+              
+                <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="SA - 相同方式共享">
+                    <i class="iconfont icon-sa"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2023/04/24/jhm-introduce/" title="Java 基准测试工具：JMH">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">Java 基准测试工具：JMH</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/07/15/leveldb-source-code-reading-4/" title="LevelDB 源代码阅读（四）：MemTable">
+                        <span class="hidden-mobile">LevelDB 源代码阅读（四）：MemTable</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+  <div id="valine"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#valine', function() {
+      Fluid.utils.createScript('https://lib.baomitu.com/valine/1.5.1/Valine.min.js', function() {
+        var options = Object.assign(
+          {"appId":"kHv7mGQE4ZKQRQrt8ybHZXpl-gzGzoHsz","appKey":"DS4jIGCnD88sjRFbPmROUtYi","path":"window.location.pathname","placeholder":null,"avatar":"retro","meta":["nick","mail","link"],"requiredFields":[],"pageSize":10,"lang":"zh-CN","highlight":false,"recordIP":false,"serverURLs":"","emojiCDN":null,"emojiMaps":null,"enableQQ":false},
+          {
+            el: "#valine",
+            path: window.location.pathname
+          }
+        )
+        new Valine(options);
+        Fluid.utils.waitElementVisible('#valine .vcontent', () => {
+          var imgSelector = '#valine .vcontent img:not(.vemoji)';
+          Fluid.plugins.imageCaption(imgSelector);
+          Fluid.plugins.fancyBox(imgSelector);
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>目录</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+    <div class="statistics">
+  
+  
+
+  
+    
+      <span id="leancloud-site-pv-container" style="display: none">
+        总访问量 
+        <span id="leancloud-site-pv"></span>
+         次
+      </span>
+    
+    
+      <span id="leancloud-site-uv-container" style="display: none">
+        总访客数 
+        <span id="leancloud-site-uv"></span>
+         人
+      </span>
+    
+    
+
+  
+</div>
+
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.0/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.18.2/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/4.3.1/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  
+      <script>
+        if (!window.MathJax) {
+          window.MathJax = {
+            tex    : {
+              inlineMath: { '[+]': [['$', '$']] }
+            },
+            loader : {
+              load: ['ui/lazy']
+            },
+            options: {
+              renderActions: {
+                insertedScript: [200, () => {
+                  document.querySelectorAll('mjx-container').forEach(node => {
+                    let target = node.parentNode;
+                    if (target.nodeName.toLowerCase() === 'li') {
+                      target.parentNode.classList.add('has-jax');
+                    }
+                  });
+                }, '', false]
+              }
+            }
+          };
+        } else {
+          MathJax.startup.document.state(0);
+          MathJax.texReset();
+          MathJax.typeset();
+          MathJax.typesetPromise();
+        }
+
+        Fluid.events.registerRefreshCallback(function() {
+          if ('MathJax' in window && MathJax.startup.document && typeof MathJax.startup.document.state === 'function') {
+            MathJax.startup.document.state(0);
+            MathJax.texReset();
+            MathJax.typeset();
+            MathJax.typesetPromise();
+          }
+        });
+      </script>
+    
+
+  <script  src="https://lib.baomitu.com/mathjax/3.2.2/es5/tex-mml-chtml.js" ></script>
+
+  <script defer src="/js/leancloud.js" ></script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">博客在允许 JavaScript 运行的环境下浏览效果更佳</div>
+  </noscript>
+</body>
+</html>
